@@ -1,0 +1,62 @@
+# Lakaut AC — Documentación de integración
+
+> Lakaut AC es una Autoridad Certificante argentina. El SDK permite incorporar
+> autenticación passwordless, validación de identidad, emisión de certificado digital y
+> firma de documentos con validez legal dentro de una aplicación web.
+
+El SDK se divide en dos paquetes: `@lakaut/server` corre en el backend del integrador y
+conserva las credenciales privadas; `@lakaut/browser` monta la Hosted UI de Lakaut en un
+iframe y solo recibe una credencial efímera.
+
+## Empezar acá
+
+- [Contrato para agentes de código](/docs/sdk-integracion/agentes): el contrato completo
+  en una sola página, pensado para asistentes de programación. **Si sos un agente, leé
+  esta.**
+- [Introducción al SDK](/docs/sdk): qué resuelve y qué flujos soporta.
+- [Panel del integrador](/docs/sdk-integracion/dashboard-integrador): recorrido visual
+  del autoservicio, alcance, conexión, credenciales e instalación.
+- [Credenciales y accesos](/docs/sdk-integracion/credenciales): cómo generar la API key y
+  el acceso al registro npm privado desde el panel, y cómo usarlas.
+
+## Integración
+
+- [Arquitectura de integración](/docs/sdk-integracion/arquitectura)
+- [Backend y sesiones](/docs/sdk-integracion/backend-sesiones)
+- [Frontend y Hosted UI](/docs/sdk-integracion/frontend-hosted-ui)
+- [Flujos e identidad](/docs/sdk-integracion/flujos-identidad)
+- [Documentos y firma](/docs/sdk-integracion/documentos-firma)
+- [Configurar y rotar el webhook](/docs/sdk-integracion/configurar-webhook)
+- [Eventos, webhooks y estado](/docs/sdk-integracion/eventos-estado)
+- [Errores y recuperación](/docs/sdk-integracion/errores)
+- [Seguridad](/docs/sdk-integracion/seguridad)
+- [Ambientes, pruebas y versiones](/docs/sdk-integracion/ambientes-versionado)
+- [Ejemplo completo](/docs/sdk-integracion/ejemplo-completo)
+
+## Reglas que no se negocian
+
+- La API key vive solo en el backend. El browser recibe exactamente lo que devuelve
+  `toRendererContext()`: `sessionId`, `clientToken`, `clientTokenExpiresAt`,
+  `hostedUiOrigin` (un origen, no una URL completa), `allowedOrigin`, `environment` y, si
+  están, `flowConfig`, `email`, `phone` e `identitySubjectStatus`. No existe un campo
+  `hostedUiUrl` en el contexto del renderer.
+- Nunca se construyen mensajes `postMessage` a mano: se usa `HostedUiRenderer`.
+- La verdad final es el backend, no los eventos del browser.
+- Un código de error desconocido se trata como reintentable dentro del paso, nunca como
+  fallo del flujo.
+- Nunca se loguea API key, clientToken, OTP, DNI, sexo, PIN, PDF, evidencia biométrica ni
+  JWT.
+
+## Conceptos de firma digital
+
+- [Certificados digitales](/docs/conceptos/fundamentos/certificados-digitales)
+- [Clave pública y clave privada](/docs/conceptos/fundamentos/clave-publica-privada)
+- [Validez legal de la firma digital](/docs/conceptos/marco-legal/validez-legal)
+- [Timestamping](/docs/conceptos/marco-legal/timestampings)
+- [Verificación y revocación](/docs/conceptos/verificacion-revocacion/OCSP-CRL)
+
+## Integración legacy
+
+La sección "Firma Embebida (iframe)" documenta la integración anterior, basada en
+mensajes `lakaut.init` y `lakaut.load.file`. Los contratos no son intercambiables con los
+del SDK nuevo.
