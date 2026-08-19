@@ -572,3 +572,26 @@ CORE-24, CORE-25 and CORE-26 until their blockers clear. Also: do not generalise
 `SignatureProvider` beyond one real implementation, and do not build per-tenant
 origins or per-tenant integrations until Lakaut answers questions 19–21. Both are
 cheap to get right now and expensive to unwind later.
+
+---
+
+## Filed issues
+
+All 28 tickets exist as issues in this repository. Dependencies are cross-linked between them.
+
+| Ticket | Issue | Ticket | Issue |
+| --- | --- | --- | --- |
+| CORE-01 | #3 | CORE-15 | #17 |
+| CORE-02 | #4 | CORE-16 | #18 |
+| CORE-03 | #5 | CORE-17 | #19 |
+| CORE-04 | #6 | CORE-18 | #20 |
+| CORE-05 | #7 | CORE-19 | #21 |
+| CORE-06 | #8 | CORE-20 | #22 |
+| CORE-07 | #9 | CORE-21 | #23 |
+| CORE-08 | #10 | CORE-22 | #24 |
+| CORE-09 | #11 | CORE-23 | #25 |
+| CORE-10 | #12 | CORE-24 | #26 |
+| CORE-11 | #13 | CORE-25 | #27 |
+| CORE-12 | #14 | CORE-26 | #28 |
+| CORE-13 | #15 | CORE-27 | #29 |
+| CORE-14 | #16 | CORE-28 | #30 |
