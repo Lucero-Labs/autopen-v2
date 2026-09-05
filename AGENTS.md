@@ -34,7 +34,8 @@ packages/rules-pagare-ar/  the Argentine pagaré rule set
 docs/research/             RESULT-001 (architecture investigation) + ADDENDUM (what changed since)
 docs/design/               one design document per non-trivial change
 docs/vendor/lakaut/        21 mirrored Lakaut doc pages + llms.txt, pinned at SDK rc.40
-docs/vendor/prototipo/     the design prototype and a brief distilled from it
+docs/product/              the current design prototype and a brief distilled from it
+docs/vendor/prototipo/     the 2026-08-16 prototype, superseded; cited by RESULT-001
 scripts/verify.sh          the one command that must pass on a laptop and in the cloud
 ```
 
