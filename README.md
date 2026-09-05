@@ -48,6 +48,7 @@ enabled, pnpm installs itself at the right version.
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm check        # biome — format + lint (`check:fix` to apply)
 pnpm build        # tsc per package → dist/
 pnpm typecheck
 pnpm test         # vitest
@@ -59,4 +60,5 @@ Claude Code cloud session (Ubuntu 24.04 x86_64). If it is green in both places,
 the environments are compatible. Filter to one package with
 `pnpm test --filter=@autopen/gate`.
 
-There is no linter or formatter; `STYLES.md` §1.2 says what to match by hand.
+Biome is the formatter and linter; `STYLES.md` §1.2 says what it enforces and
+what is still left to review.

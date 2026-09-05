@@ -9,6 +9,9 @@ echo "arch    $(uname -m)"
 echo "remote  ${CLAUDE_CODE_REMOTE:-false}"
 
 pnpm install --frozen-lockfile
+# First because it needs no build and finishes in milliseconds: the cheapest
+# failure should not wait behind the most expensive one.
+pnpm run check:ci
 pnpm run build
 pnpm run typecheck
 pnpm run test

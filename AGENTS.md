@@ -57,10 +57,12 @@ Root scripts, each delegating to Turborepo (`turbo.json`):
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm check       # biome: format + lint, report only
+pnpm check:fix   # biome: apply what it can fix
 pnpm build       # tsc per package → dist/
 pnpm typecheck   # tsc --noEmit over src/ and test/
 pnpm test        # vitest run, per package
-pnpm verify      # scripts/verify.sh: install + build + typecheck + test
+pnpm verify      # scripts/verify.sh: install + check + build + typecheck + test
 ```
 
 Filter to one package: `pnpm test --filter=@autopen/gate`. Bypass the Turbo
@@ -73,8 +75,11 @@ Gotchas:
   root commands build dependencies first — but running `vitest` directly inside
   a package after editing a *dependency's* source tests stale code. Run from
   the root.
-- There is no linter or formatter. Style is by hand and by review; STYLES §1.2
-  says what to match.
+- Biome (`biome.json`, pinned exact) is the formatter and linter, and runs
+  inside `pnpm verify` before the build — it needs no `dist/` and finishes in
+  milliseconds. It enforces the mechanical half of STYLES §1.2 plus the rules
+  that are checkable: no `any`, no `!`, no default exports, `import type`,
+  kebab-case filenames. The rest of STYLES is still by hand and by review.
 - Node 22 (`.nvmrc`, `engines`) and pnpm 10.11.1 (`packageManager`, via
   Corepack) are pinned to the Claude Code cloud image. Do not bump them
   casually; `pnpm verify` green in both places is the compatibility check.

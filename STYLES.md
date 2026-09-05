@@ -59,7 +59,10 @@ When two approaches both work, these decide. They override personal preference.
   helpers, exported declarations. A helper used by one export may sit directly
   below it; a helper used by two sits above both.
 - Two-space indent, double quotes, semicolons, trailing commas, 100 columns.
-  There is no formatter; match the surrounding file exactly.
+  Biome enforces all five (`biome.json`); `pnpm check:fix` applies them. Import
+  order (§2) is not mechanised — Biome's organiser also alphabetises a barrel's
+  named exports, which would scramble `core/src/index.ts` out of the reading
+  order its contracts follow. That one stays a review rule.
 - `index.ts` is a barrel and nothing else: `export { … } from` and
   `export type { … } from`, no logic. Export what a consumer needs and no more.
 
@@ -316,7 +319,7 @@ verdict stays explicable after the rules change.
 
 Before opening or updating a PR:
 
-1. `pnpm verify` passes from the root — install, build, typecheck, test.
+1. `pnpm verify` passes from the root — install, check, build, typecheck, test.
 2. Every new export has a contract JSDoc; every new field is `readonly`; every
    returned object is frozen (§4, §5).
 3. No `any`, no `!`, no `Date.now()` in gated or hashed code, no money as a
