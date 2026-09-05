@@ -1,4 +1,4 @@
-# RESULT-001 · Addendum — vendor drift, rc.34 → rc.40
+# RESULT-001 · Addendum
 
 **Dated 2026-09-05.** Accompanies `RESULT-001-core-signing-evidence.md`
 (PR #1), which was written against the vendor documentation as it stood on
@@ -6,9 +6,10 @@
 
 RESULT-001 is **not edited**. It records what was knowable on the day it was
 written and why we concluded what we did; rewriting it to look correct in
-hindsight would destroy that trail. This file records what moved underneath it.
+hindsight would destroy that trail. This file records what moved underneath it:
+§1–§7 the vendor's drift from rc.34 to rc.40, §8 the product scope.
 
-## How this was established
+## How the vendor drift was established
 
 The mirror in `docs/vendor/lakaut/` was re-fetched through the identical
 pipeline used on 2026-08-16 — same page list, same `<article>` extraction, same
@@ -164,3 +165,16 @@ uniqueness per session or per integrator — is unaffected and still blocks.
 
 Everything else stands, and question **5** is now the one with the longest lead
 time and the most downstream design behind it.
+
+## 8. Product scope has narrowed
+
+RESULT-001 §1 and §2.1 frame the core around a first client product — a
+loan-origination flow for one industry, signing a secured pagaré — and expect a
+second, different signing product to follow. That framing is no longer current.
+The core is built for a document; the first is an Argentine pagaré
+(`packages/rules-pagare-ar`). Lakaut is the provider; no second provider or
+product is planned, which is what §1 and §7 already advised.
+
+Nothing in §2 or §3 changes: the operations, the constraints and the sandbox
+list are about signing a PDF and holding evidence of it, not about what the PDF
+says. `README.md` is the live description.
