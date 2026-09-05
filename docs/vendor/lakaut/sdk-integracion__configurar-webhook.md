@@ -4,6 +4,8 @@
 
 El webhook se administra por ambiente desde **Integradores → Mi integración**. La URL y el secreto no los configura soporte: los genera y valida el propio integrador desde el dashboard.
 
+Lakaut valida el protocolo con un receptor sintético propio antes de publicar una versión, pero ese receptor no reemplaza ni proxifica el webhook del integrador. Para activar una integración real, el integrador despliega su endpoint HTTPS, guarda esa URL en el panel, genera allí su secreto y ejecuta **Verificar destino**. Lakaut nunca necesita levantar ni administrar el dominio del cliente.
+
 <span class="admonitionIcon_Rf37">![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMTIgMTYiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTUuMDUuMzFjLjgxIDIuMTcuNDEgMy4zOC0uNTIgNC4zMUMzLjU1IDUuNjcgMS45OCA2LjQ1LjkgNy45OGMtMS40NSAyLjA1LTEuNyA2LjUzIDMuNTMgNy43LTIuMi0xLjE2LTIuNjctNC41Mi0uMy02LjYxLS42MSAyLjAzLjUzIDMuMzMgMS45NCAyLjg2IDEuMzktLjQ3IDIuMy41MyAyLjI3IDEuNjctLjAyLjc4LS4zMSAxLjQ0LTEuMTMgMS44MSAzLjQyLS41OSA0Ljc4LTMuNDIgNC43OC01LjU2IDAtMi44NC0yLjUzLTMuMjItMS4yNS01LjYxLTEuNTIuMTMtMi4wMyAxLjEzLTEuODkgMi43NS4wOSAxLjA4LTEuMDIgMS44LTEuODYgMS4zMy0uNjctLjQxLS42Ni0xLjE5LS4wNi0xLjc4QzguMTggNS4zMSA4LjY4IDIuNDUgNS4wNS4zMkw1LjAzLjNsLjAyLjAxeiIgLz48L3N2Zz4=)</span>El secreto vive solo en tu backend
 
 No lo incluyas en el browser, repositorios, tickets ni logs. Copialo directamente desde el diálogo **Guardá esta credencial ahora** a tu gestor de secretos.
@@ -140,6 +142,8 @@ app.post("/webhooks/lakaut", express.raw({ type: "application/json", limit: "64k
 <span class="admonitionIcon_Rf37">![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMTYgMTYiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTguODkzIDEuNWMtLjE4My0uMzEtLjUyLS41LS44ODctLjVzLS43MDMuMTktLjg4Ni41TC4xMzggMTMuNDk5YS45OC45OCAwIDAgMCAwIDEuMDAxYy4xOTMuMzEuNTMuNTAxLjg4Ni41MDFoMTMuOTY0Yy4zNjcgMCAuNzA0LS4xOS44NzctLjVhMS4wMyAxLjAzIDAgMCAwIC4wMS0xLjAwMkw4Ljg5MyAxLjV6bS4xMzMgMTEuNDk3SDYuOTg3di0yLjAwM2gyLjAzOXYyLjAwM3ptMC0zLjAwNEg2Ljk4N1Y1Ljk4N2gyLjAzOXY0LjAwNnoiIC8+PC9zdmc+)</span>El challenge no es un evento de negocio
 
 Usa headers y material de firma distintos. No lo pases a `constructWebhookEvent()`: esa función verifica eventos `auth.*` y `otp.*`, explicados en [Eventos, webhooks y estado](/documentacion-docusaurus-preprod/docs/sdk-integracion/eventos-estado).
+
+La implementación recomendada es `constructWebhookChallengeResponse()` de `@lakaut/server`: valida los bytes crudos, los tres headers, la vigencia, el identificador y la firma en tiempo constante, y construye el `proof` de respuesta. El ejemplo manual anterior sirve para explicar el contrato; no conviene mantener una implementación criptográfica paralela si se utiliza el SDK oficial.
 
 ## Cambiar URL o rotar el secreto
 

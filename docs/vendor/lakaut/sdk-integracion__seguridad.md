@@ -64,7 +64,7 @@ Hosted UI usa iframe sandboxed y política `no-referrer`.
 
 ## Content Security Policy
 
-`hostedUiOrigin` viaja en cada sesión, pero no cambia de una sesión a otra: es un valor fijo por ambiente, que sale de la configuración del servicio de Hosted UI, no algo que el integrador elija ni que varíe según el usuario o el flujo. Por eso tu CSP puede ser estática — no necesitás leerla de la respuesta de cada sesión ni actualizarla en runtime:
+`hostedUiOrigin` viaja en cada sesión y esa respuesta es la autoridad del contrato. El integrador no lo elige ni debe derivarlo del valor `sandbox`. Lakaut procura un origen estable por ambiente, por lo que la CSP puede configurarse con el inventario entregado en el onboarding; aun así, validá cada sesión contra esa allowlist y no supongas que DEV, PREPROD y PROD comparten host:
 
 ```
 frame-src 'self' https://sdk-preprod.lakautac.com.ar;
@@ -135,7 +135,7 @@ El PIN:
 
 Recibir `bytes` y `finalPdfHash` desde el mismo browser no demuestra por sí solo que esos bytes sean el artefacto firmado por Lakaut. Confirmá el estado mediante `getSignedDocumentStatus` o el webhook firmado.
 
-Si tu caso requiere custodia probatoria del PDF exacto, la validación CMS server-side ya viene en `@lakaut/server`: `verifySignedPdfArtifact(artifact, authority, { cmsVerifier })` con `OpenSslCmsVerifier`. No hay que coordinar ningún mecanismo aparte. La receta completa —con los códigos de error y la evidencia que devuelve— está en [Documentos y firma](/documentacion-docusaurus-preprod/docs/sdk-integracion/documentos-firma#custodia-probatoria-verifysignedpdfartifact).
+Si tu caso requiere custodia probatoria del PDF exacto, `@lakaut/server` ofrece `verifyAndAcknowledgeSignedArtifact()` para verificar, custodiar y registrar el binding 1.2 en ese orden. `verifySignedPdfArtifact(artifact, authority, { cmsVerifier })` queda disponible como operación de bajo nivel. La receta completa está en [Documentos y firma](/documentacion-docusaurus-preprod/docs/sdk-integracion/documentos-firma#custodia-y-binding-12).
 
 ## Reportes y soporte
 

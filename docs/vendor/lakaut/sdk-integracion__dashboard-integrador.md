@@ -29,7 +29,7 @@ Esta separación es importante: el panel permite operar la integración, pero no
 
 La cabecera identifica la integración seleccionada. Las tres tarjetas muestran:
 
-- **Nombre de la integración:** nombre visible, `slug`, estado y ambiente. El `slug` es el `integratorId` que usa tu backend.
+- **Nombre de la integración:** nombre visible, `slug`, estado y ambiente. El slug es una etiqueta legible; no reemplaza el UUID canónico que usa tu backend.
 - **Responsable técnico:** persona o cuenta responsable de la operación.
 - **Empresa / contrato:** referencia comercial asociada por Lakaut.
 
@@ -82,8 +82,11 @@ El badge **Config vN** identifica la revisión de configuración. El otro badge 
 
 | Estado | Significado |
 |----|----|
-| **Borrador** | La configuración todavía no está lista para operar completamente |
-| **Activo** | La integración está habilitada para el alcance asignado |
+| **Borrador** (`DRAFT`) | El alta existe, pero todavía no fue provisionada completamente |
+| **Activando** (`PROVISIONING`) | Lakaut está sincronizando dependencias y credenciales |
+| **Activo** (`ACTIVE`) | La integración está habilitada para el alcance asignado |
+| **Suspendido** (`SUSPENDED`) | El acceso fue detenido de forma reversible |
+| **Revocado** (`REVOKED`) | El alta ya no puede operar |
 | **No configurado** | Esa parte, por ejemplo el webhook, todavía no fue preparada |
 | **Pendiente de verificar** | El secreto existe, pero falta probar el destino |
 | **Verificado** | El destino respondió correctamente a la prueba firmada |
@@ -120,7 +123,7 @@ La credencial Nexus se configura en npm o pnpm como un secreto de CI. No se escr
 ## Recorrido recomendado de primera configuración
 
 1.  Confirmá ambiente, empresa, responsable y alcance contratado.
-2.  Copiá el `integratorId` y guardalo en la configuración server-side.
+2.  Copiá el UUID canónico `X-Integrator-Id` desde **Empresa / contrato** y guardalo en la configuración server-side.
 3.  Declará los dominios HTTPS exactos que van a embeber la Hosted UI.
 4.  Guardá y verificá el webhook.
 5.  Generá la API key SDK y guardala en el backend.

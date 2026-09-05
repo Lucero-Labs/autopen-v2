@@ -6,7 +6,7 @@ Toda sesión comienza en el backend del integrador. Este límite evita que la AP
 
 <span class="admonitionIcon_Rf37">![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMTQgMTYiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTcgMi4zYzMuMTQgMCA1LjcgMi41NiA1LjcgNS43cy0yLjU2IDUuNy01LjcgNS43QTUuNzEgNS43MSAwIDAgMSAxLjMgOGMwLTMuMTQgMi41Ni01LjcgNS43LTUuN3pNNyAxQzMuMTQgMSAwIDQuMTQgMCA4czMuMTQgNyA3IDcgNy0zLjE0IDctNy0zLjE0LTctNy03em0xIDNINnY1aDJWNHptMCA2SDZ2Mmgydi0yeiIgLz48L3N2Zz4=)</span>De dónde salen estas credenciales
 
-`LAKAUT_INTEGRATOR_ID` es el slug de tu integración y `LAKAUT_API_KEY` la generás vos desde [Credenciales y accesos](/documentacion-docusaurus-preprod/docs/sdk-integracion/credenciales). Guardalas en tu gestor de secretos: no las inventes, no las reutilices entre ambientes y no las expongas al frontend.
+`LAKAUT_INTEGRATOR_ID` es el UUID canónico de tu integración y `LAKAUT_API_KEY` la generás vos desde [Credenciales y accesos](/documentacion-docusaurus-preprod/docs/sdk-integracion/credenciales). Guardalas en tu gestor de secretos: no las inventes, no las reutilices entre ambientes y no las expongas al frontend.
 
 ## Configurar el cliente
 
@@ -39,8 +39,8 @@ Para preproducción:
 
 ```
 LAKAUT_AUTH_BASE_URL=https://auth-preprod.lakautac.com.ar
-LAKAUT_INTEGRATOR_ID=el-slug-de-tu-integracion
-LAKAUT_API_KEY=el-valor-que-copiaste-del-dashboard
+LAKAUT_INTEGRATOR_ID=<uuid-canónico-preprod>
+LAKAUT_API_KEY=<api-key-preprod>
 ```
 
 Los metadatos de compatibilidad deben coincidir con la versión que instalaste. No copies valores de otro ambiente.
@@ -84,6 +84,8 @@ Protegé este endpoint con la autenticación de tu aplicación. Asociá cada `se
 | `returnUrl` | No | URL absoluta de retorno |
 | `cancelUrl` | No | URL absoluta de cancelación |
 | `continuationFromSessionId` | No | Continuación segura hacia una sesión `SIGNING` u `ONBOARDING_AND_SIGNING` |
+| `visibleSignaturePlacement` | No | Página y posición versionadas del sello visible para journeys con firma |
+| `capabilities` | No | Opt-in server-side a `signed-document-reconciliation:1.2` |
 
 \* Mandá `flowType` o `journeyId` (al menos uno) — el SDK resuelve el recorrido a partir de cualquiera de los dos.
 
@@ -109,6 +111,45 @@ const catalog = await sessions.getCatalog();
 ```
 
 Un detalle que cambia el resultado: si omitís `authenticationProfileId`, el default depende de **cómo** elegiste el recorrido. Con `journeyId` se usa el default de ese journey; con `flowType` se usa siempre `auth.email-sms.v1`, aunque además mandes el `journeyId`. Hoy la diferencia solo se nota en firma —`journey.signing.v1` tiene como default `auth.email.v1`, así que `{ flowType: "SIGNING" }` termina pidiendo también SMS y `{ journeyId: "journey.signing.v1" }` no—. Si el método de autenticación te importa, mandá `authenticationProfileId` explícito.
+
+## Saber si el titular puede firmar
+
+Si no sabés si la persona ya tiene un certificado utilizable, consultá la elegibilidad antes de elegir el journey:
+
+```
+const eligibility = await sessions.getSigningEligibility({
+  externalUserRef: req.user.id,
+  email: req.user.email,
+  correlationId: req.id,
+});
+
+if (eligibility.nextAction === "RETRY") {
+  res.set("Retry-After", String(eligibility.retryAfterSeconds));
+  return res.status(503).json({ code: eligibility.decision });
+}
+
+if (eligibility.nextAction === "CONTACT_LAKAUT") {
+  return res.status(409).json({ code: eligibility.decision });
+}
+
+const created = await sessions.createSession({
+  flowType: eligibility.recommendedJourneyId,
+  allowedOrigin: process.env.APP_PUBLIC_ORIGIN,
+  externalUserRef: req.user.id,
+  email: req.user.email,
+});
+```
+
+| Decisión | Acción |
+|----|----|
+| `READY_FOR_SIGNING` | crear `SIGNING` |
+| `ONBOARDING_REQUIRED` | crear `ONBOARDING_AND_SIGNING` si está autorizado, o contactar a Lakaut |
+| `CERTIFICATE_PREPARING` | respetar `retryAfterSeconds` y volver a consultar |
+| `RETRY_LATER` | reintentar de forma acotada |
+
+La respuesta tiene `validUntil` y no enumera certificados ni devuelve seriales.
+
+Si omitís la consulta y creás `SIGNING`, Lakaut valida el certificado después de autenticar al titular. Uno vencido o revocado produce `CERTIFICATE_REQUIRED`: no pide PIN, no firma y no convierte automáticamente el journey en onboarding.
 
 Los ejemplos de esta guía usan `allowedOrigin` fijo por variable de entorno porque asumen una app de un solo origen — ahí es correcto, no hay ningún header de cliente en juego. Si tu app sirve varios subdominios con una sola integración (multi-tenant), resolvé `allowedOrigin` por request contra tu propia lista en vez de una constante — ver ["El comodín no aplica a la sesión"](/documentacion-docusaurus-preprod/docs/sdk-integracion/credenciales#el-comod%C3%ADn-no-aplica-a-la-sesi%C3%B3n) para el patrón completo.
 

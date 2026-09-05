@@ -9,6 +9,8 @@ Hay dos superficies de error distintas y conviene no confundirlas:
 
 Ninguna de las dos expone detalles internos. No muestres el texto crudo de un error de backend directamente al usuario.
 
+La validación local de una posición de firma inválida usa `INVALID_VISIBLE_SIGNATURE_PLACEMENT`. Corregí página/coordenadas y no intentes firmar sin sello como fallback; el error ocurre antes del PIN y de la operación criptográfica.
+
 ## Lo único que hay que decidir
 
 Ante cualquier error, la pregunta es siempre la misma: **¿el titular puede resolverlo reintentando?**

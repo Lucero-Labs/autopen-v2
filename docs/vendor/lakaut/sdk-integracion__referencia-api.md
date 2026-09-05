@@ -43,7 +43,7 @@ Solo `completeSession` y `cancelSession` lanzan `AuthTransportError` (con `code`
 
 ### `SessionClient`
 
-La superficie que vas a usar. Recibe un transporte y expone seis operaciones:
+La superficie que vas a usar. Recibe un transporte y expone estas operaciones:
 
 ```
 new SessionClient(transport: AuthTransport)
@@ -52,11 +52,13 @@ new SessionClient(transport: AuthTransport)
 | Método | Devuelve |
 |----|----|
 | `createSession(input: CreateSessionInput)` | `Promise<CreateSessionOutput>` |
+| `getSigningEligibility(input)` | `Promise<SigningEligibilityDecision>` |
 | `getSession(sessionId: string)` | `Promise<AuthoritativeSessionStatus>` |
 | `completeSession(sessionId: string)` | `Promise<AuthoritativeSessionStatus>` |
 | `cancelSession(sessionId: string)` | `Promise<AuthoritativeSessionStatus>` |
 | `getSignedDocumentStatus(sessionId, documentId)` | `Promise<SignedDocumentStatus>` |
 | `getCatalog()` | `Promise<JourneyCatalogSnapshot>` |
+| `verifyAndAcknowledgeSignedArtifact(input)` | `Promise<VerifyAndAcknowledgeSignedArtifactResult>` |
 
 `getCatalog()` es la respuesta a *"¿qué `journeyId` y `authenticationProfileId` puedo usar?"*. Devuelve lo que tu integración tiene habilitado, sin que tengas que hardcodear la matriz:
 
@@ -78,6 +80,28 @@ interface JourneyCatalogSnapshot {
 
 Nunca expone la regla de evidencia ni el grafo de ejecución del recorrido.
 
+`getSigningEligibility()` permite elegir entre firma y onboarding sin enumerar certificados:
+
+```
+interface SigningEligibilityInput {
+  externalUserRef: string;
+  email: string;
+  correlationId?: string;
+}
+
+interface SigningEligibilityDecision {
+  decisionVersion: "1.0";
+  decision: "READY_FOR_SIGNING" | "ONBOARDING_REQUIRED"
+    | "CERTIFICATE_PREPARING" | "RETRY_LATER";
+  recommendedJourneyId: "SIGNING" | "ONBOARDING_AND_SIGNING" | null;
+  nextAction: "CREATE_SESSION" | "RETRY" | "CONTACT_LAKAUT";
+  retryAfterSeconds: number | null;
+  checkedAt: string;
+  validUntil: string;
+  correlationId: string;
+}
+```
+
 #### `CreateSessionInput`
 
 ```
@@ -93,6 +117,8 @@ interface CreateSessionInput {
   returnUrl?: string;
   cancelUrl?: string;
   continuationFromSessionId?: string;    // server-side only
+  visibleSignaturePlacement?: VisibleSignaturePlacementV1;
+  capabilities?: readonly ["signed-document-reconciliation:1.2"];
 
   // Declarados en el tipo, pero el transporte NO los envía — ver abajo
   clientContext?: Record<string, unknown>;
@@ -139,6 +165,7 @@ interface CreateSessionOutput {
   email?: string;
   phone?: string;
   identitySubjectStatus?: IdentitySubjectStatus;
+  signedArtifactCompletion?: "delivery" | "verified_binding";
 }
 ```
 
@@ -189,6 +216,20 @@ interface VerifyWebhookOptions {
 Lanza si la firma no valida, si falta un header obligatorio o si el timestamp quedó fuera de la ventana. El `rawBody` tiene que ser el cuerpo sin parsear.
 
 ### Verificación de documentos firmados
+
+La operación recomendada para sesiones 1.2 es:
+
+```
+sessions.verifyAndAcknowledgeSignedArtifact({
+  artifact: SignedDocumentArtifact,
+  idempotencyKey: string,
+  correlationId?: string,
+  custody: async (artifact, evidence) => { /* persistencia durable */ },
+  verification?: VerifySignedPdfArtifactOptions,
+}): Promise<{ evidence: SignedPdfVerificationEvidence; binding: SignedArtifactBindingResult }>
+```
+
+Consulta autoridad, verifica PDF/CMS/hashes, espera la custodia y registra el binding en ese orden. Sólo funciona si la sesión negoció `signed-document-reconciliation:1.2`.
 
 ```
 verifySignedPdfArtifact(

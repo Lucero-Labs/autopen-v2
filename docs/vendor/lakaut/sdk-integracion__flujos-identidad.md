@@ -4,7 +4,7 @@
 
 ## Autenticación passwordless
 
-`PASSWORDLESS_AUTH` solicita el email y envía un OTP. Si el backend ya proporcionó el email, Hosted UI puede avanzar directamente al código.
+`PASSWORDLESS_AUTH` ejecuta los factores del `authenticationProfileId` habilitado: `auth.email.v1`, `auth.sms.v1` o `auth.email-sms.v1`. Si el backend ya proporcionó los inputs requeridos, Hosted UI puede avanzar directamente al código correspondiente.
 
 Los códigos son:
 
@@ -20,7 +20,7 @@ El integrador nunca debe capturar o reenviar el OTP desde su backend.
 `ONBOARDING` ejecuta:
 
 1.  aceptación de términos;
-2.  autenticación por email y OTP;
+2.  autenticación según el perfil habilitado;
 3.  obtención de DNI y sexo, si faltan;
 4.  validación de identidad con Veriff;
 5.  validación de datos contra RENAPER;
@@ -39,6 +39,10 @@ Si DNI y sexo fueron proporcionados por el backend, el paso de captura se omite,
 5.  firma y entrega el PDF.
 
 La clave incorrecta se puede corregir en la misma pantalla. El SDK conserva la sesión y el documento y borra únicamente el PIN ingresado.
+
+Si tu backend no sabe si el titular tiene un certificado vigente, ejecutá `sessions.getSigningEligibility({ externalUserRef, email })` antes de crear la sesión. La respuesta recomienda `SIGNING`, `ONBOARDING_AND_SIGNING`, esperar o contactar a Lakaut sin revelar seriales.
+
+Si igualmente creás `SIGNING`, Lakaut vuelve a validar el certificado después de la autenticación. Un certificado vencido o revocado devuelve `CERTIFICATE_REQUIRED`: no solicita PIN, no firma y no inicia onboarding automáticamente.
 
 ## Onboarding y firma
 

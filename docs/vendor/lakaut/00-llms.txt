@@ -10,6 +10,8 @@ iframe y solo recibe una credencial efímera.
 
 ## Empezar acá
 
+- [Guía completa para integradores](/docs/sdk-integracion/guia-integrador): estados,
+  credenciales, journeys, elegibilidad, orígenes, firma PDF y webhooks.
 - [Contrato para agentes de código](/docs/sdk-integracion/agentes): el contrato completo
   en una sola página, pensado para asistentes de programación. **Si sos un agente, leé
   esta.**
@@ -18,6 +20,8 @@ iframe y solo recibe una credencial efímera.
   del autoservicio, alcance, conexión, credenciales e instalación.
 - [Credenciales y accesos](/docs/sdk-integracion/credenciales): cómo generar la API key y
   el acceso al registro npm privado desde el panel, y cómo usarlas.
+- [Checklist de onboarding](/docs/sdk-integracion/checklist-onboarding): matriz separada
+  para DEV, PREPROD y PROD sin incluir secretos.
 
 ## Integración
 
