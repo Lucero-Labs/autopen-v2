@@ -1,3 +1,18 @@
 packages:
   - "packages/*"
   - "apps/*"
+
+# Fail the install when Node is outside the `engines` range, instead of warning
+# and failing later with a confusing module or syntax error.
+engineStrict: true
+
+# Resolve a dependency to the workspace copy when one satisfies the range.
+preferWorkspacePackages: true
+
+autoInstallPeers: true
+
+# Single source for versions used by more than one package. Referenced as
+# `"typescript": "catalog:"`.
+catalog:
+  typescript: 5.9.3
+  vitest: 4.1.11
