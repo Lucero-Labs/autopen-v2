@@ -7,8 +7,7 @@ carries the work.
 **Scope.** The *core* as bounded in RESULT-001 §2.1: an instrument from the moment
 its parameters are known until an evidence bundle about it is exported. Track D is
 included because §7 recommends it even though the borrower surface sits on the
-client-product side of the boundary. The dealership UI, borrower acquisition and
-post-default collections are out of scope.
+client side of the boundary. Everything else on that side is out of scope.
 
 **Two rules this backlog encodes, both from the research:**
 
@@ -119,10 +118,10 @@ error. The id allocation scheme is documented and stable across environments.
 
 ### CORE-06 · Instrument package (ordered document set) · **M**
 
-**Why.** §3.2. An origination needs pagaré **plus** prenda form **plus** consumer
-disclosure, and B2 resolved positively: Lakaut supports multiple documents per
-session, sequentially, with a distinct `documentId` each. The hypothesis's singular
-*"a document"* is a prototype artefact (§2.6).
+**Why.** §3.2. One signing may cover several documents, and B2 resolved
+positively: Lakaut supports multiple documents per session, sequentially, with a
+distinct `documentId` each. The hypothesis's singular *"a document"* is a
+prototype artefact (§2.6).
 
 **Scope.** An ordered set of sealed documents sharing one ceremony; per-document
 completion tracking; package-level completeness.
@@ -194,9 +193,9 @@ boot, not discovered at the first signature.
 ### CORE-10 · Independent RFC-3161 timestamp at ingest · **S**
 
 **Why.** §3.9. No trusted timestamp is documented anywhere in Lakaut's SDK —
-`signedAt` appears in all three structures, a TSA token in none. For a 24-month loan
-enforced after default, proving the signature predates certificate expiry is
-precisely the question that matters.
+`signedAt` appears in all three structures, a TSA token in none. For a document
+enforced years after signing, proving the signature predates certificate expiry
+is precisely the question that matters.
 
 **Scope.** Timestamp the archived artefact at ingest against an independent TSA;
 store the token alongside the evidence object.

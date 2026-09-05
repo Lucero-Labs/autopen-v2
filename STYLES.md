@@ -100,7 +100,7 @@ When two approaches both work, these decide. They override personal preference.
 ### 3.2 Spanish stays Spanish
 
 Argentine legal terms are Spanish wherever they appear — identifiers, rule ids,
-messages, docs: `pagaré`, `prenda`, `lugarDePago`, `integracionDeConsumo`,
+messages, docs: `pagaré`, `lugarDePago`, `integracionDeConsumo`,
 `primerVencimiento`, `cuota`, `liquidación`, `constancia`, `persona física /
 jurídica`. They are terms of art with no English equivalent an Argentine lawyer
 would recognise; a half-translated codebase (`paymentPlace`) is one where nobody
