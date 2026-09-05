@@ -40,10 +40,7 @@ describe("pagaré AR policy — the prototype's S1 panel", () => {
   it("points each finding at the field that caused it", async () => {
     const verdict = await evaluate(draft());
 
-    expect(verdict.findings.map((f) => f.path)).toEqual([
-      "lugarDePago",
-      "integracionDeConsumo",
-    ]);
+    expect(verdict.findings.map((f) => f.path)).toEqual(["lugarDePago", "integracionDeConsumo"]);
   });
 
   it("is issuable once both are completed", async () => {

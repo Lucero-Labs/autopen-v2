@@ -1,0 +1,50 @@
+# The mechanical gate under every PR. It runs `pnpm verify` — the same script a
+# laptop and a cloud session run — rather than restating its steps in YAML, so
+# there is one definition of "green" and no second sequence to drift from it.
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+# A new push supersedes the run it interrupts; paying for both proves nothing.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Before setup-node, so its `cache: pnpm` has a pnpm binary to find. The
+      # version is read from `packageManager` in package.json, never an input here.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # Separated from `verify` so lockfile drift — the failure that breaks a
+      # cloud session at startup — fails under a step name that says what broke.
+      # verify.sh installs again; the second run is a no-op.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify
+        run: pnpm verify

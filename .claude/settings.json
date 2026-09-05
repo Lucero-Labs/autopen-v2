@@ -18,6 +18,8 @@
       "Bash(pnpm build:*)",
       "Bash(pnpm typecheck:*)",
       "Bash(pnpm test:*)",
+      "Bash(pnpm check)",
+      "Bash(pnpm check:ci)",
       "Bash(pnpm verify)",
       "Bash(pnpm turbo run:*)",
       "Bash(bash scripts/verify.sh)",
