@@ -32,8 +32,7 @@ packages/core/             contracts + error classes. Zero dependencies.
 packages/gate/             PolicyGate engine, InMemoryPolicyRegistry, rule factories
 packages/rules-pagare-ar/  the Argentine pagaré rule set
 docs/research/             RESULT-001 (architecture investigation) + ADDENDUM (what changed since)
-docs/planning/             BACKLOG-001 — 28 tickets, each filed as a GitHub issue
-docs/design/               one design document per non-trivial ticket
+docs/design/               one design document per non-trivial change
 docs/vendor/lakaut/        21 mirrored Lakaut doc pages + llms.txt, pinned at SDK rc.40
 docs/vendor/prototipo/     the design prototype and a brief distilled from it
 scripts/verify.sh          the one command that must pass on a laptop and in the cloud
@@ -103,14 +102,18 @@ from memory. The vendor's seven non-negotiable rules
 
 We have no Lakaut sandbox or dashboard credentials. Until they exist:
 
-- CORE-23, the multi-party signature spike, cannot run. CORE-24, CORE-25 and
-  CORE-26 are blocked behind it.
+- The multi-party signature question — whether one session can carry more than
+  one signer — cannot be settled, so nothing depending on its answer should be
+  designed yet.
 - The 18-item sandbox verification list in RESULT-001 §6 is unrun.
-- Nothing in Track C (adapter) or Track D (borrower surface) can be tested
-  against a live session.
+- Nothing in the adapter or the signing surface can be tested against a live
+  session.
 
-Production URLs and credentials are `TBD` on the vendor's side as well. Tracks A
-and B (instrument, evidence) depend on nothing Lakaut can change; start there.
+Production URLs and credentials are `TBD` on the vendor's side as well.
+
+Start with the instrument and the evidence bundle instead. They depend on
+nothing Lakaut can change, and they are where the value sits: the precondition
+gate is what makes a document enforceable, and Lakaut never sees it.
 
 ## Environment
 
@@ -120,6 +123,6 @@ reading both. Never copy their contents into a log, a fixture, or a chat.
 
 ## Design documents
 
-A non-trivial ticket gets a design document in `docs/design/` before code; the
-directory's README says what one contains. Decisions that a ticket in
-BACKLOG-001 already made do not need re-deciding — cite the ticket.
+A non-trivial change gets a design document in `docs/design/` before code; the
+directory's README says what one contains. A decision its issue already made
+does not need re-deciding — cite the issue.

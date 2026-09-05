@@ -13,7 +13,7 @@ The first document is an Argentine *pagaré*; its rule set is
 | Question | Read |
 | --- | --- |
 | Why is the core shaped this way? | `docs/research/RESULT-001-core-signing-evidence.md` §1–§3, then the `ADDENDUM` |
-| What is the work, in order? | `docs/planning/BACKLOG-001-core.md` — 28 tickets, each a GitHub issue |
+| What is the work? | The open GitHub issues |
 | How is a ticket designed before coding? | `docs/design/` |
 | What does the vendor actually say? | `docs/vendor/lakaut/` — a faithful mirror at SDK `0.1.0-rc.40` |
 | What did the prototype look like? | `docs/vendor/prototipo/` |

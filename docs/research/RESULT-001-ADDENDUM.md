@@ -178,3 +178,9 @@ product is planned, which is what §1 and §7 already advised.
 Nothing in §2 or §3 changes: the operations, the constraints and the sandbox
 list are about signing a PDF and holding evidence of it, not about what the PDF
 says. `README.md` is the live description.
+
+BACKLOG-001, which broke the core into 28 `CORE-NN` tickets, was retired with
+this change; all 28 issues were closed as not planned on 2026-08-19 and the
+document was deleted. `CORE-NN` references elsewhere in this addendum name
+tickets that no longer exist — they are kept because this file is a dated
+record. Open GitHub issues are the live plan.
