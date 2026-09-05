@@ -8,10 +8,9 @@ echo "pnpm    $(pnpm -v 2>/dev/null || echo 'not installed')"
 echo "arch    $(uname -m)"
 echo "remote  ${CLAUDE_CODE_REMOTE:-false}"
 
-# Steps get added here as the workspace grows:
-#   pnpm install --frozen-lockfile
-#   pnpm -r build
-#   pnpm -r typecheck
-#   pnpm -r test
+pnpm install --frozen-lockfile
+pnpm run build
+pnpm run typecheck
+pnpm run test
 
 echo "verify: ok"
