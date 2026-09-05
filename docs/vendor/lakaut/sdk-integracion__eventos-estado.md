@@ -143,15 +143,15 @@ Si necesitás verificar sin el SDK, el cálculo es:
 HMAC-SHA256(secreto, `${timestamp}.${eventId}.${rawBody}`)
 ```
 
-en hexadecimal minúscula, comparado en tiempo constante contra el valor `v1=` del header `Lakaut-Signature`. El `timestamp` es el valor `t=` del mismo header. La tolerancia por defecto es de **300 segundos**: rechazá lo que quede fuera de esa ventana.
+en hexadecimal minúscula, comparado en tiempo constante contra el valor `v1=` del header `Lakaut-Signature`. El `timestamp` es el valor `t=` del mismo header y debe coincidir con `Lakaut-Event-Timestamp`. La tolerancia por defecto es de **300 segundos**: rechazá lo que quede fuera de esa ventana.
 
 <span class="admonitionIcon_Rf37">![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMTYgMTYiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTguODkzIDEuNWMtLjE4My0uMzEtLjUyLS41LS44ODctLjVzLS43MDMuMTktLjg4Ni41TC4xMzggMTMuNDk5YS45OC45OCAwIDAgMCAwIDEuMDAxYy4xOTMuMzEuNTMuNTAxLjg4Ni41MDFoMTMuOTY0Yy4zNjcgMCAuNzA0LS4xOS44NzctLjVhMS4wMyAxLjAzIDAgMCAwIC4wMS0xLjAwMkw4Ljg5MyAxLjV6bS4xMzMgMTEuNDk3SDYuOTg3di0yLjAwM2gyLjAzOXYyLjAwM3ptMC0zLjAwNEg2Ljk4N1Y1Ljk4N2gyLjAzOXY0LjAwNnoiIC8+PC9zdmc+)</span>`t=` es un instante ISO-8601, no epoch de Stripe
 
 El header tiene la misma forma que el de Stripe (`t=...,v1=...`), pero **no** es el mismo esquema: `t=` no es epoch en segundos, es un timestamp ISO-8601 (`2026-08-12T14:39:00.123Z`). Si armás la verificación a mano, parseá `t=` como fecha ISO-8601 antes de compararlo contra el momento actual — tratarlo como epoch numérico rompe la ventana de tolerancia. `constructWebhookEvent()` ya maneja esto, es otra razón para usarlo en vez de reimplementar la verificación.
 
-## Constancia de documento firmado
+## Constancia de documento firmado 1.1 y 1.2
 
-`auth.document.signed` contiene metadatos:
+Sin opt-in, `auth.document.signed` conserva el contrato inmediato `1.1.0`:
 
 ```
 {
@@ -171,9 +171,29 @@ El header tiene la misma forma que el de Stripe (`t=...,v1=...`), pero **no** es
 
 El webhook nunca transporta el PDF ni la firma CMS.
 
-<span class="admonitionIcon_Rf37">![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMTQgMTYiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTYuMyA1LjY5YS45NDIuOTQyIDAgMCAxLS4yOC0uN2MwLS4yOC4wOS0uNTIuMjgtLjcuMTktLjE4LjQyLS4yOC43LS4yOC4yOCAwIC41Mi4wOS43LjI4LjE4LjE5LjI4LjQyLjI4LjcgMCAuMjgtLjA5LjUyLS4yOC43YTEgMSAwIDAgMS0uNy4zYy0uMjggMC0uNTItLjExLS43LS4zek04IDcuOTljLS4wMi0uMjUtLjExLS40OC0uMzEtLjY5LS4yLS4xOS0uNDItLjMtLjY5LS4zMUg2Yy0uMjcuMDItLjQ4LjEzLS42OS4zMS0uMi4yLS4zLjQ0LS4zMS42OWgxdjNjLjAyLjI3LjExLjUuMzEuNjkuMi4yLjQyLjMxLjY5LjMxaDFjLjI3IDAgLjQ4LS4xMS42OS0uMzEuMi0uMTkuMy0uNDIuMzEtLjY5SDhWNy45OHYuMDF6TTcgMi4zYy0zLjE0IDAtNS43IDIuNTQtNS43IDUuNjggMCAzLjE0IDIuNTYgNS43IDUuNyA1LjdzNS43LTIuNTUgNS43LTUuN2MwLTMuMTUtMi41Ni01LjY5LTUuNy01LjY5di4wMXpNNyAuOThjMy44NiAwIDcgMy4xNCA3IDdzLTMuMTQgNy03IDctNy0zLjEyLTctNyAzLjE0LTcgNy03eiIgLz48L3N2Zz4=)</span>`finalPdfHash` no viaja acá
+Con el opt-in `capabilities: ["signed-document-reconciliation:1.2"]`, Lakaut espera que tu backend verifique, custodie y registre el binding del mismo artefacto. Recién en estado `BOUND` emite:
 
-`data.signedContentHash` es el único hash que expone el webhook. `finalPdfHash` es un campo distinto que solo existe en `SignedDocumentArtifact`, el objeto que llega al *browser* en `onDocumentSigned` (ver [Documentos y firma](/documentacion-docusaurus-preprod/docs/sdk-integracion/documentos-firma)) — nunca se persiste server-side ni se reenvía por webhook. Si tu backend necesita confirmar el hash de forma autoritativa, usá `signedContentHash` de acá o de `getSignedDocumentStatus`.
+```
+{
+  "type": "auth.document.signed",
+  "version": "1.2.0",
+  "sessionId": "SESSION_ID",
+  "finalStatus": "SIGNED",
+  "data": {
+    "documentId": "contract-42",
+    "signedContentHash": "HASH_CONTENIDO_FIRMADO",
+    "finalPdfHash": "HASH_PDF_FINAL",
+    "algorithm": "SHA-256",
+    "signedAt": "2026-08-19T18:00:00Z",
+    "artifactBindingStatus": "BOUND",
+    "bindingId": "6ff38b26-74aa-4a43-a465-2cb9db1cbca7"
+  }
+}
+```
+
+`signedContentHash` es evidencia del contenido autorizado por Lakaut. `finalPdfHash` identifica los bytes finales que el integrador verificó, custodió y vinculó por el canal server-to-server. Auth no recibe el PDF ni afirma haber recalculado ese hash.
+
+No se emiten 1.1 y 1.2 para la misma firma. Sin opt-in permanece 1.1 y no se inventa un backfill para receipts anteriores. Durante la migración, el receptor nuevo debe aceptar ambos contratos.
 
 ## Reintentos
 

@@ -10,6 +10,8 @@ El SDK de Lakaut te permite incorporar autenticación passwordless, validación 
 
 → [Credenciales y accesos](/documentacion-docusaurus-preprod/docs/sdk-integracion/credenciales)
 
+Si es tu primera integración, empezá por la [Guía completa para integradores](/documentacion-docusaurus-preprod/docs/sdk-integracion/guia-integrador): reúne estados del portal, credenciales, journeys, elegibilidad, orígenes, PDF y webhooks.
+
 **2. La implementás en tu aplicación.** Instalás dos paquetes npm: uno crea la sesión desde tu backend, el otro monta la experiencia en el navegador.
 
 → [Quickstart](/documentacion-docusaurus-preprod/docs/sdk-integracion/quickstart)
@@ -25,7 +27,7 @@ Esa división no es un detalle de implementación: es la razón por la que una i
 
 <span class="admonitionIcon_Rf37">![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMTQgMTYiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTcgMi4zYzMuMTQgMCA1LjcgMi41NiA1LjcgNS43cy0yLjU2IDUuNy01LjcgNS43QTUuNzEgNS43MSAwIDAgMSAxLjMgOGMwLTMuMTQgMi41Ni01LjcgNS43LTUuN3pNNyAxQzMuMTQgMSAwIDQuMTQgMCA4czMuMTQgNyA3IDcgNy0zLjE0IDctNy0zLjE0LTctNy03em0xIDNINnY1aDJWNHptMCA2SDZ2Mmgydi0yeiIgLz48L3N2Zz4=)</span>Estado de la versión
 
-Disponible para integraciones controladas en preproducción. Producción todavía no tiene endpoints ni credenciales públicas; Lakaut los comunica durante el onboarding productivo.
+La candidata `0.1.0-rc.40` está disponible para integraciones controladas en preproducción. Producción todavía no tiene endpoints ni credenciales públicas; Lakaut los comunica durante el onboarding productivo.
 
 ## Flujos soportados
 
@@ -44,18 +46,19 @@ Hay tres canales de información y **solo uno es la verdad**: el backend. Los ev
 
 ## Recorrido recomendado
 
-1.  [Credenciales y accesos](/documentacion-docusaurus-preprod/docs/sdk-integracion/credenciales) — configurá tu integración
-2.  [Quickstart](/documentacion-docusaurus-preprod/docs/sdk-integracion/quickstart) — de cero a un titular firmando
-3.  [Arquitectura de integración](/documentacion-docusaurus-preprod/docs/sdk-integracion/arquitectura)
-4.  [Backend y sesiones](/documentacion-docusaurus-preprod/docs/sdk-integracion/backend-sesiones)
-5.  [Frontend y Hosted UI](/documentacion-docusaurus-preprod/docs/sdk-integracion/frontend-hosted-ui)
-6.  [Flujos e identidad](/documentacion-docusaurus-preprod/docs/sdk-integracion/flujos-identidad)
-7.  [Documentos y firma](/documentacion-docusaurus-preprod/docs/sdk-integracion/documentos-firma)
-8.  [Configurar y rotar el webhook](/documentacion-docusaurus-preprod/docs/sdk-integracion/configurar-webhook)
-9.  [Eventos, webhooks y estado](/documentacion-docusaurus-preprod/docs/sdk-integracion/eventos-estado)
-10. [Errores y recuperación](/documentacion-docusaurus-preprod/docs/sdk-integracion/errores)
-11. [Seguridad](/documentacion-docusaurus-preprod/docs/sdk-integracion/seguridad) — antes de producción
-12. [Referencia de API](/documentacion-docusaurus-preprod/docs/sdk-integracion/referencia-api)
+1.  [Guía completa para integradores](/documentacion-docusaurus-preprod/docs/sdk-integracion/guia-integrador)
+2.  [Credenciales y accesos](/documentacion-docusaurus-preprod/docs/sdk-integracion/credenciales) — configurá tu integración
+3.  [Quickstart](/documentacion-docusaurus-preprod/docs/sdk-integracion/quickstart) — de cero a un titular firmando
+4.  [Arquitectura de integración](/documentacion-docusaurus-preprod/docs/sdk-integracion/arquitectura)
+5.  [Backend y sesiones](/documentacion-docusaurus-preprod/docs/sdk-integracion/backend-sesiones)
+6.  [Frontend y Hosted UI](/documentacion-docusaurus-preprod/docs/sdk-integracion/frontend-hosted-ui)
+7.  [Flujos e identidad](/documentacion-docusaurus-preprod/docs/sdk-integracion/flujos-identidad)
+8.  [Documentos y firma](/documentacion-docusaurus-preprod/docs/sdk-integracion/documentos-firma)
+9.  [Configurar y rotar el webhook](/documentacion-docusaurus-preprod/docs/sdk-integracion/configurar-webhook)
+10. [Eventos, webhooks y estado](/documentacion-docusaurus-preprod/docs/sdk-integracion/eventos-estado)
+11. [Errores y recuperación](/documentacion-docusaurus-preprod/docs/sdk-integracion/errores)
+12. [Seguridad](/documentacion-docusaurus-preprod/docs/sdk-integracion/seguridad) — antes de producción
+13. [Referencia de API](/documentacion-docusaurus-preprod/docs/sdk-integracion/referencia-api)
 
 ¿Integrás con un asistente de programación? Pasale el [contrato para agentes](/documentacion-docusaurus-preprod/docs/sdk-integracion/agentes).
 

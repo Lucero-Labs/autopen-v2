@@ -25,7 +25,7 @@ Valores públicos actuales:
 | Dashboard | `https://web-preprod.lakautac.com.ar/dashboard/integrators` |
 | Hosted UI | `https://sdk-preprod.lakautac.com.ar` — el origen exacto llega en la respuesta de creación de sesión |
 
-Lakaut te asigna la integración y el alcance comercial. A partir de ahí, la credencial de Nexus, la API key SDK, los dominios permitidos y el webhook los administrás vos desde el dashboard, sin trámite — ver [Credenciales y accesos](/documentacion-docusaurus-preprod/docs/sdk-integracion/credenciales). El `integratorId` es el slug de tu integración y no cambia.
+Lakaut te asigna la integración y el alcance comercial. A partir de ahí, la credencial de Nexus, la API key SDK, los dominios permitidos y el webhook los administrás vos desde el dashboard, sin trámite — ver [Credenciales y accesos](/documentacion-docusaurus-preprod/docs/sdk-integracion/credenciales). El `integratorId` es el UUID canónico que muestra **Empresa / contrato**; el slug es sólo una etiqueta y no lo reemplaza.
 
 El `allowedOrigin` que mandás en cada sesión se valida contra los dominios que declaraste y queda vinculado a la credencial efímera de esa sesión. Guardar la configuración sube la revisión (`Config v*n*`); la propagación a los runtimes no es instantánea, así que no declares un origen y lances tráfico en el mismo segundo.
 
@@ -38,14 +38,14 @@ Las URLs, credenciales y registro de producción son `TBD`. No uses fallbacks a 
 ```
 LAKAUT_ENVIRONMENT=sandbox
 LAKAUT_AUTH_BASE_URL=https://auth-preprod.lakautac.com.ar
-LAKAUT_INTEGRATOR_ID=valor-secreto
-LAKAUT_API_KEY=valor-secreto
+LAKAUT_INTEGRATOR_ID=<uuid-canónico-preprod>
+LAKAUT_API_KEY=<secreto-preprod>
 LAKAUT_ALLOWED_ORIGIN=https://app-preprod.integrador.example
 # Sólo si configuraste un webhook:
-LAKAUT_WEBHOOK_SECRET=valor-secreto
+LAKAUT_WEBHOOK_SECRET=<secreto-webhook-preprod>
 ```
 
-No definas la API key en variables expuestas por Vite, Next.js o el bundler del frontend.
+`LAKAUT_INTEGRATOR_ID` no es secreto, pero pertenece a un ambiente concreto. La API key y el secreto webhook sí son secretos. No los definas en variables expuestas por Vite, Next.js o el bundler del frontend.
 
 Estos valores no se autogeneran. La API key y el acceso al registro npm los emitís vos desde [Credenciales y accesos](/documentacion-docusaurus-preprod/docs/sdk-integracion/credenciales), y ahí mismo los rotás o revocás.
 
@@ -85,9 +85,9 @@ Fijá versiones exactas y mantené los tres paquetes en el mismo release:
 ```
 {
   "dependencies": {
-    "@lakaut/browser": "0.1.0-rc.34",
-    "@lakaut/server": "0.1.0-rc.34",
-    "@lakaut/shared-contracts": "0.1.0-rc.34"
+    "@lakaut/browser": "0.1.0-rc.40",
+    "@lakaut/server": "0.1.0-rc.40",
+    "@lakaut/shared-contracts": "0.1.0-rc.40"
   }
 }
 ```

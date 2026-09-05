@@ -4,7 +4,7 @@
 
 Esta página está escrita para que un asistente de programación integre el SDK sin inventar nada. Es autocontenida: contiene el contrato completo, en un formato pensado para pegarse en el contexto de un agente.
 
-También está disponible como texto plano en <a href="/documentacion-docusaurus-preprod/assets/files/llms-623d739f54bfc12d771c79b82d2c267e.txt" target="_blank"><code>/llms.txt</code></a>.
+También está disponible como texto plano en <a href="/documentacion-docusaurus-preprod/assets/files/llms-891449eb26322eb60cf69ee9894c5135.txt" target="_blank"><code>/llms.txt</code></a>.
 
 <span class="admonitionIcon_Rf37">![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMTIgMTYiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTYuNSAwQzMuNDggMCAxIDIuMTkgMSA1YzAgLjkyLjU1IDIuMjUgMSAzIDEuMzQgMi4yNSAxLjc4IDIuNzggMiA0djFoNXYtMWMuMjItMS4yMi42Ni0xLjc1IDItNCAuNDUtLjc1IDEtMi4wOCAxLTMgMC0yLjgxLTIuNDgtNS01LjUtNXptMy42NCA3LjQ4Yy0uMjUuNDQtLjQ3LjgtLjY3IDEuMTEtLjg2IDEuNDEtMS4yNSAyLjA2LTEuNDUgMy4yMy0uMDIuMDUtLjAyLjExLS4wMi4xN0g1YzAtLjA2IDAtLjEzLS4wMi0uMTctLjItMS4xNy0uNTktMS44My0xLjQ1LTMuMjMtLjItLjMxLS40Mi0uNjctLjY3LTEuMTFDMi40NCA2Ljc4IDIgNS42NSAyIDVjMC0yLjIgMi4wMi00IDQuNS00IDEuMjIgMCAyLjM2LjQyIDMuMjIgMS4xOUMxMC41NSAyLjk0IDExIDMuOTQgMTEgNWMwIC42Ni0uNDQgMS43OC0uODYgMi40OHpNNCAxNGg1Yy0uMjMgMS4xNC0xLjMgMi0yLjUgMnMtMi4yNy0uODYtMi41LTJ6IiAvPjwvc3ZnPg==)</span>Cómo usarla
 
@@ -23,7 +23,7 @@ Pegale a tu agente el contenido de esta página, o pasale la URL. Todo lo que ne
 ## Paquetes
 
 ```
-npm install @lakaut/server@0.1.0-rc.34 @lakaut/browser@0.1.0-rc.34
+npm install @lakaut/server@0.1.0-rc.40 @lakaut/browser@0.1.0-rc.40
 ```
 
 | Paquete                    | Dónde corre                                  |
@@ -40,7 +40,7 @@ Dos credenciales, dos superficies:
 
 | Credencial | Headers | Dónde |
 |----|----|----|
-| API key | `X-Integrator-Id: <slug>` + `X-API-Key: <secreto>` | Backend |
+| API key | `X-Integrator-Id: <UUID canónico>` + `X-API-Key: <secreto>` | Backend |
 | Credencial efímera | `Authorization: Bearer <clientToken>` + `Origin: <origen exacto>` | Hosted UI |
 
 La Hosted UI renueva su credencial sola al 70 % de la vida útil. El integrador no implementa esa renovación.
@@ -70,7 +70,13 @@ Cuerpo — `allowedOrigin` es el único campo obligatorio:
   "authenticationProfileId": "...",
   "returnUrl": "...",
   "cancelUrl": "...",
-  "continuationFromSessionId": "<uuid>"
+  "continuationFromSessionId": "<uuid>",
+  "visibleSignaturePlacement": {
+    "version": "1",
+    "page": 2,
+    "placement": { "custom": { "x": 125, "y": 250 } }
+  },
+  "capabilities": ["signed-document-reconciliation:1.2"]
 }
 ```
 
@@ -84,6 +90,8 @@ Recorrido y perfil:
 - `journey.onboarding.v1` y `journey.onboarding-signing.v1` solo admiten `auth.email-sms.v1`. `journey.login.v1` y `journey.signing.v1` admiten los tres perfiles.
 
 Consultá `GET /v1/sdk/catalog` en vez de hardcodear estas combinaciones: devuelve los journeys, los perfiles y la lista de `allowedCombinations` habilitados para tu integración.
+
+Antes de elegir `SIGNING`, `SessionClient.getSigningEligibility({ externalUserRef, email })` consulta el estado sin enumerar certificados. Decisiones: `READY_FOR_SIGNING`, `ONBOARDING_REQUIRED`, `CERTIFICATE_PREPARING` y `RETRY_LATER`. Un `SIGNING` con certificado vencido o revocado produce `CERTIFICATE_REQUIRED` después de autenticar: no pide PIN, no firma y no cambia automáticamente a onboarding.
 
 Respuesta `201`:
 
@@ -129,10 +137,12 @@ Es el TTL de la **credencial efímera del browser** (`clientToken`). La respuest
 | Método | Path | Para qué |
 |----|----|----|
 | `GET` | `/v1/sdk/catalog` | Journeys y perfiles disponibles |
+| `POST` | `/v1/sdk/signing-eligibility` | Elegir firma/onboarding sin enumerar certificados |
 | `GET` | `/v1/sdk/sessions/{sessionId}/status` | Estado autoritativo |
 | `POST` | `/v1/sdk/sessions/{sessionId}/complete` | Cerrar la sesión |
 | `POST` | `/v1/sdk/sessions/{sessionId}/cancel` | Cancelar |
 | `GET` | `/v1/sdk/sessions/{sessionId}/documents/{documentId}/status` | Estado del documento firmado |
+| `POST` | `/v1/sdk/sessions/{sessionId}/documents/{documentId}/signed-artifact-binding` | Vincular el PDF verificado para 1.2 |
 
 `documentId` debe matchear `^[A-Za-z0-9._:-]{1,120}$`. Si no matchea, la respuesta es `404` con código `FORBIDDEN` — no `400`.
 
@@ -219,7 +229,7 @@ Lakaut-Event-Id: <uuid>
 Lakaut-Event-Type: auth.session.completed
 Lakaut-Event-Timestamp: <ISO-8601>
 Lakaut-Signature: t=<timestamp>,v1=<hmac-sha256-hex>
-Lakaut-Schema-Version: 1.1.0
+Lakaut-Schema-Version: 1.1.0 | 1.2.0
 ```
 
 Verificación:
@@ -231,7 +241,7 @@ import { constructWebhookEvent } from "@lakaut/server";
 const event = constructWebhookEvent(rawBody, headers, webhookSecret);
 ```
 
-El HMAC-SHA256 se calcula sobre `` `${timestamp}.${eventId}.${rawBody}` `` con el secreto en UTF-8, en hex minúscula. La tolerancia de timestamp por defecto es de 300 segundos.
+El HMAC-SHA256 se calcula sobre `` `${timestamp}.${eventId}.${rawBody}` `` con el secreto en UTF-8, en hex minúscula. `Lakaut-Event-Timestamp` debe ser igual a `t=`. La tolerancia por defecto es de 300 segundos.
 
 Tipos de evento: `auth.session.created`, `auth.session.completed`, `auth.session.cancelled`, `auth.session.failed`, `auth.session.expired`, `auth.document.signed`, `otp.challenge.sent`, `otp.challenge.failed`.
 
@@ -240,6 +250,10 @@ Los webhooks pueden repetirse: el manejo tiene que ser idempotente por `idempote
 ## Documentos firmados
 
 Si llega `signed_document_delivery_failed`, **el documento ya está firmado**. No volver a firmarlo: reconciliar consultando el estado del documento desde el backend.
+
+`auth.document.signed` 1.1 contiene `signedContentHash`. El carril opt-in 1.2 espera `SessionClient.verifyAndAcknowledgeSignedArtifact()`, que verifica, espera custodia y registra el binding; recién en `BOUND` el evento agrega `finalPdfHash`. El webhook nunca transporta el PDF.
+
+La posición visible usa página basada en 1 y coordenadas normalizadas enteras de 0 a 1000 con origen superior izquierdo; respeta `CropBox` y rotación. En la candidata `0.1.0-rc.40` validada para preproducción, el camino browser ensambla una única revisión incremental, preserva firmas previas y permite verificar PAdES B-B/B-T; B-T exige un timestamp RFC 3161 válido. Esto no acredita B-LT/B-LTA ni producción.
 
 ## Errores frecuentes al integrar
 

@@ -17,15 +17,15 @@ Con el `.npmrc` ya configurado:
 - Yarn
 
 ```
-npm install @lakaut/server@0.1.0-rc.34 @lakaut/browser@0.1.0-rc.34
+npm install @lakaut/server@0.1.0-rc.40 @lakaut/browser@0.1.0-rc.40
 ```
 
 ```
-pnpm add @lakaut/server@0.1.0-rc.34 @lakaut/browser@0.1.0-rc.34
+pnpm add @lakaut/server@0.1.0-rc.40 @lakaut/browser@0.1.0-rc.40
 ```
 
 ```
-yarn add @lakaut/server@0.1.0-rc.34 @lakaut/browser@0.1.0-rc.34
+yarn add @lakaut/server@0.1.0-rc.40 @lakaut/browser@0.1.0-rc.40
 ```
 
 ## 2. Crear la sesión en tu backend

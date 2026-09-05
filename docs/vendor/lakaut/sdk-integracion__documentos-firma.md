@@ -53,6 +53,30 @@ const renderer = new HostedUiRenderer({
 
 Esta opción es útil cuando el integrador todavía no tiene el PDF en su sistema.
 
+## Posición visible de la firma
+
+El backend puede fijarla al crear una sesión `SIGNING` u `ONBOARDING_AND_SIGNING`:
+
+```
+const created = await sessions.createSession({
+  flowType: "SIGNING",
+  allowedOrigin: process.env.APP_PUBLIC_ORIGIN,
+  visibleSignaturePlacement: {
+    version: "1",
+    page: 2,
+    placement: { custom: { x: 125, y: 250 } },
+  },
+});
+```
+
+- `page` comienza en 1; si se omite, se usa la última página.
+- Las coordenadas `x`/`y` son enteros normalizados de 0 a 1000, no píxeles ni puntos.
+- `(0,0)` es la esquina superior izquierda del `CropBox` visible, después de considerar rotaciones 0, 90, 180 o 270 grados.
+- `x`/`y` ubican la esquina superior izquierda del sello.
+- Como alternativa usá el preset versionado `lakaut-default-bottom-right@1`.
+
+Una geometría inválida devuelve `INVALID_VISIBLE_SIGNATURE_PLACEMENT` antes del PIN y antes de firmar. No hay clamp, cambio de página ni movimiento silencioso.
+
 ## Recibir una copia del PDF firmado
 
 `onDocumentSigned` recibe en el browser una copia del artefacto que debe tratarse como entrada no confiable:
@@ -103,9 +127,9 @@ interface SignedDocumentArtifact {
 }
 ```
 
-<span class="admonitionIcon_Rf37">![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMTQgMTYiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTYuMyA1LjY5YS45NDIuOTQyIDAgMCAxLS4yOC0uN2MwLS4yOC4wOS0uNTIuMjgtLjcuMTktLjE4LjQyLS4yOC43LS4yOC4yOCAwIC41Mi4wOS43LjI4LjE4LjE5LjI4LjQyLjI4LjcgMCAuMjgtLjA5LjUyLS4yOC43YTEgMSAwIDAgMS0uNy4zYy0uMjggMC0uNTItLjExLS43LS4zek04IDcuOTljLS4wMi0uMjUtLjExLS40OC0uMzEtLjY5LS4yLS4xOS0uNDItLjMtLjY5LS4zMUg2Yy0uMjcuMDItLjQ4LjEzLS42OS4zMS0uMi4yLS4zLjQ0LS4zMS42OWgxdjNjLjAyLjI3LjExLjUuMzEuNjkuMi4yLjQyLjMxLjY5LjMxaDFjLjI3IDAgLjQ4LS4xMS42OS0uMzEuMi0uMTkuMy0uNDIuMzEtLjY5SDhWNy45OHYuMDF6TTcgMi4zYy0zLjE0IDAtNS43IDIuNTQtNS43IDUuNjggMCAzLjE0IDIuNTYgNS43IDUuNyA1LjdzNS43LTIuNTUgNS43LTUuN2MwLTMuMTUtMi41Ni01LjY5LTUuNy01LjY5di4wMXpNNyAuOThjMy44NiAwIDcgMy4xNCA3IDdzLTMuMTQgNy03IDctNy0zLjEyLTctNyAzLjE0LTcgNy03eiIgLz48L3N2Zz4=)</span>`finalPdfHash` es exclusivo de este artefacto del browser
+<span class="admonitionIcon_Rf37">![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMTQgMTYiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTYuMyA1LjY5YS45NDIuOTQyIDAgMCAxLS4yOC0uN2MwLS4yOC4wOS0uNTIuMjgtLjcuMTktLjE4LjQyLS4yOC43LS4yOC4yOCAwIC41Mi4wOS43LjI4LjE4LjE5LjI4LjQyLjI4LjcgMCAuMjgtLjA5LjUyLS4yOC43YTEgMSAwIDAgMS0uNy4zYy0uMjggMC0uNTItLjExLS43LS4zek04IDcuOTljLS4wMi0uMjUtLjExLS40OC0uMzEtLjY5LS4yLS4xOS0uNDItLjMtLjY5LS4zMUg2Yy0uMjcuMDItLjQ4LjEzLS42OS4zMS0uMi4yLS4zLjQ0LS4zMS42OWgxdjNjLjAyLjI3LjExLjUuMzEuNjkuMi4yLjQyLjMxLjY5LjMxaDFjLjI3IDAgLjQ4LS4xMS42OS0uMzEuMi0uMTkuMy0uNDIuMzEtLjY5SDhWNy45OHYuMDF6TTcgMi4zYy0zLjE0IDAtNS43IDIuNTQtNS43IDUuNjggMCAzLjE0IDIuNTYgNS43IDUuNyA1LjdzNS43LTIuNTUgNS43LTUuN2MwLTMuMTUtMi41Ni01LjY5LTUuNy01LjY5di4wMXpNNyAuOThjMy44NiAwIDcgMy4xNCA3IDdzLTMuMTQgNy03IDctNy0zLjEyLTctNyAzLjE0LTcgNy03eiIgLz48L3N2Zz4=)</span>Dos contratos de webhook
 
-No se persiste server-side ni viaja en el webhook `auth.document.signed` (ver [Eventos y estado](/documentacion-docusaurus-preprod/docs/sdk-integracion/eventos-estado)) — ahí solo existe `signedContentHash`. Si tu backend necesita el hash de forma autoritativa (no solo lo que reportó el browser), usá `signedContentHash` del webhook o de `getSignedDocumentStatus`.
+Sin opt-in, `auth.document.signed` `1.1.0` contiene `signedContentHash` pero no `finalPdfHash`. Con `capabilities: ["signed-document-reconciliation:1.2"]`, tu backend verifica, custodia y vincula el artefacto; recién entonces el webhook `1.2.0` incluye ambos hashes y `artifactBindingStatus: "BOUND"`.
 
 ## Falla de entrega
 
@@ -151,9 +175,26 @@ La respuesta confirma:
 - fecha de firma;
 - `correlationId`.
 
-## Custodia probatoria: `verifySignedPdfArtifact`
+## Custodia y binding 1.2
 
-Si necesitás probar que **esos bytes exactos** contienen la firma válida, no hace falta coordinar ningún mecanismo con Lakaut: `@lakaut/server` ya lo trae. `verifySignedPdfArtifact` extrae la firma CMS separada del PDF, la valida contra el contenido firmado y cruza el artefacto que llegó por el browser con el estado autoritativo.
+Para el contrato 1.2, usá la operación compuesta. La función consulta la autoridad, verifica los bytes, ejecuta tu callback de custodia y registra el binding server-to-server:
+
+```
+const result = await sessions.verifyAndAcknowledgeSignedArtifact({
+  artifact,
+  idempotencyKey: `${artifact.sessionId}:${artifact.documentId}:custody`,
+  correlationId: req.id,
+  custody: async (verifiedArtifact, evidence) => {
+    await guardarConEvidencia(verifiedArtifact.bytes, evidence);
+  },
+});
+```
+
+El callback debe terminar la custodia durable antes del binding. Un replay exacto devuelve el binding original; los mismos identificadores con hashes diferentes producen conflicto. Un fallo nunca autoriza otra firma.
+
+## Verificación de bajo nivel: `verifySignedPdfArtifact`
+
+Si necesitás controlar la verificación y custodia por separado, `@lakaut/server` expone `verifySignedPdfArtifact`. La función extrae la firma CMS separada del PDF, la valida contra el contenido firmado y cruza el artefacto que llegó por el browser con el estado autoritativo.
 
 ```
 import {
@@ -217,6 +258,22 @@ Los fallos llegan como `SignedDocumentVerificationError` con un `code` que disti
 | `signed_document_verifier_busy` | El verificador está saturado |
 
 Los tres últimos son problemas de tu entorno, no del documento: reintentá antes de concluir que la firma es inválida.
+
+## Capacidades criptográficas actuales
+
+La candidata `0.1.0-rc.40`, validada para preproducción, tiene estas capacidades y límites verificables:
+
+| Capacidad | Estado |
+|----|----|
+| Actualización incremental | **Soportada**: agrega una única revisión incremental |
+| Preservación de firmas previas | **Soportada** y validada con una cadena real de firmas anteriores |
+| PAdES B-B | **Soportado** como base de la firma PDF |
+| PAdES B-T | **Soportado** cuando el timestamp RFC 3161 resulta válido |
+| PAdES B-LT / B-LTA | **No soportado** en esta versión |
+| TSA/RFC 3161 | **Soportada** en preproducción; el integrador no configura la TSA |
+| Material LTV | **No soportado** en esta versión |
+
+La CMS dentro del PDF puede estar codificada en BER o DER; el verificador oficial acepta ambas, valida `ByteRange`, exige padding `00` y rechaza alteraciones del contenido firmado. La disponibilidad indicada corresponde al release y ambiente documentados; no implica PAdES B-LT/B-LTA ni habilita producción automáticamente.
 
 ## Más de un documento
 

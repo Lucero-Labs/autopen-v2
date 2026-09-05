@@ -19,7 +19,7 @@ Para conocer cada bloque y el orden recomendado de primera configuración, empez
 
 Un administrador de Lakaut tiene que asignarte una integración y el alcance comercial acordado. Hasta que eso pase, al entrar al link vas a ver el mensaje *"No hay integradores disponibles"* — no es un error tuyo, es que todavía no te dieron el permiso. Pedíselo a tu contacto en Lakaut; una vez asignado, el resto de esta página lo hacés vos.
 
-**Qué es autoservicio y qué no.** El alta inicial de la integración y el alcance comercial contratado (qué recorridos y paquetes tenés habilitados) los administra Lakaut — eso sí requiere pedirlo. Pero una vez asignada la integración, las cuatro cosas de la tabla de arriba las administrás **vos mismo, sin ningún trámite**: emitir y rotar tu API key SDK y tu credencial de Nexus, y agregar o modificar dominios permitidos y el webhook, todo desde esta misma pantalla. No hace falta abrir un ticket para sumar un origen nuevo o cambiar la URL del webhook.
+**Qué es autoservicio y qué no.** El alta inicial de la integración y el alcance comercial contratado (qué recorridos y paquetes tenés habilitados) los administra Lakaut — eso sí requiere pedirlo. Pero una vez asignada la integración, las cuatro cosas de la tabla de arriba las administrás **vos mismo, sin ningún trámite**: emitir y rotar tu API key SDK y tu credencial de Nexus, y agregar o modificar orígenes —incluido un wildcard seguro de un nivel— y el webhook, todo desde esta misma pantalla.
 
 ## El dashboard
 
@@ -27,7 +27,7 @@ Un administrador de Lakaut tiene que asignarte una integración y el alcance com
 
 La pantalla se divide en cuatro bloques:
 
-**1. Resumen.** Quién sos ante Lakaut: nombre de la integración, slug, ambiente, responsable técnico y empresa/contrato. El slug (`prueba-banco` en la imagen) es tu `integratorId`: el valor que va en el header `X-Integrator-Id`.
+**1. Resumen.** Quién sos ante Lakaut: nombre de la integración, slug, ambiente, responsable técnico y empresa/contrato. En **Empresa / contrato** aparece el UUID canónico `X-Integrator-Id`, con una acción para copiarlo. El slug (`prueba-banco` en la imagen) es sólo una etiqueta legible y no reemplaza ese UUID.
 
 **2. Qué puede usar tu integración.** Los journeys habilitados y, dentro de cada uno, los métodos de autenticación disponibles. En cada sesión tu backend elige una de esas combinaciones. El alcance lo administra Lakaut según tu acuerdo comercial: si necesitás uno que no figura, pedilo por el canal comercial.
 
@@ -50,7 +50,7 @@ Autentica a tu **backend** contra la API de Lakaut: crear sesiones, consultar es
 Se envía en dos headers, siempre juntos:
 
 ```
-X-Integrator-Id: prueba-banco
+X-Integrator-Id: <UUID canónico del ambiente>
 X-API-Key: <el valor que copiaste del dashboard>
 ```
 
@@ -101,29 +101,29 @@ Reglas que el sistema aplica al validarlos:
 - **HTTPS obligatorio**, con host completo.
 - **Sin path, query ni fragment.** Solo esquema, host y puerto opcional.
 - El host se normaliza a minúsculas; el puerto se conserva si es explícito.
-- **Un origen por línea, enumerado.** Los comodines todavía no se pueden declarar desde este formulario — ver abajo.
+- **Un origen o patrón por línea.** Podés enumerar orígenes concretos o declarar un comodín seguro de un nivel como se explica abajo.
 
-### Comodines: todavía no
+### Comodines de un nivel
 
-<span class="admonitionIcon_Rf37">![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMTYgMTYiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTguODkzIDEuNWMtLjE4My0uMzEtLjUyLS41LS44ODctLjVzLS43MDMuMTktLjg4Ni41TC4xMzggMTMuNDk5YS45OC45OCAwIDAgMCAwIDEuMDAxYy4xOTMuMzEuNTMuNTAxLjg4Ni41MDFoMTMuOTY0Yy4zNjcgMCAuNzA0LS4xOS44NzctLjVhMS4wMyAxLjAzIDAgMCAwIC4wMS0xLjAwMkw4Ljg5MyAxLjV6bS4xMzMgMTEuNDk3SDYuOTg3di0yLjAwM2gyLjAzOXYyLjAwM3ptMC0zLjAwNEg2Ljk4N1Y1Ljk4N2gyLjAzOXY0LjAwNnoiIC8+PC9zdmc+)</span>El formulario acepta un comodín pero el guardado falla
+El dashboard permite guardar un patrón como `https://*.clientes.miempresa.com`. El comodín debe ser la etiqueta completa situada más a la izquierda, sólo puede usar HTTPS con el puerto predeterminado y tiene que cubrir un dominio registrable bajo tu control. Por ejemplo:
 
-Si escribís `https://*.clientes.miempresa.com`, ni el campo ni la validación del formulario se quejan, pero al guardar el control plane lo rechaza con *"Origin must use HTTPS and include a host"*. El mensaje confunde —tu origen **sí** era HTTPS—: el validador no reconoce el `*` como parte de un host y concluye que no hay host.
+```
+https://*.clientes.miempresa.com
+```
 
-**Enumerá los orígenes uno por uno.** Si tu aplicación es multi-tenant y crea subdominios sin intervención tuya, hablalo con tu contacto en Lakaut antes de diseñar la integración alrededor de un comodín.
-
-La capacidad existe aguas abajo —el servicio de autenticación entiende comodines de un solo nivel, exige HTTPS y rechaza los que cubrirían un dominio público como `https://*.com.ar`—, pero hoy no hay camino desde el dashboard hasta ahí. Lo documentamos para que no diseñes contando con eso: cuando se habilite, estas serán las reglas.
+Ese patrón admite `https://tenant-a.clientes.miempresa.com`, pero no el dominio base `https://clientes.miempresa.com`, un subdominio con otro nivel adicional ni variantes con otro esquema o puerto. Patrones demasiado amplios como `https://*.com.ar`, comodines intermedios como `https://apps.*.miempresa.com` y comodines múltiples se rechazan al guardar.
 
 <span class="admonitionIcon_Rf37">![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMTQgMTYiPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTYuMyA1LjY5YS45NDIuOTQyIDAgMCAxLS4yOC0uN2MwLS4yOC4wOS0uNTIuMjgtLjcuMTktLjE4LjQyLS4yOC43LS4yOC4yOCAwIC41Mi4wOS43LjI4LjE4LjE5LjI4LjQyLjI4LjcgMCAuMjgtLjA5LjUyLS4yOC43YTEgMSAwIDAgMS0uNy4zYy0uMjggMC0uNTItLjExLS43LS4zek04IDcuOTljLS4wMi0uMjUtLjExLS40OC0uMzEtLjY5LS4yLS4xOS0uNDItLjMtLjY5LS4zMUg2Yy0uMjcuMDItLjQ4LjEzLS42OS4zMS0uMi4yLS4zLjQ0LS4zMS42OWgxdjNjLjAyLjI3LjExLjUuMzEuNjkuMi4yLjQyLjMxLjY5LjMxaDFjLjI3IDAgLjQ4LS4xMS42OS0uMzEuMi0uMTkuMy0uNDIuMzEtLjY5SDhWNy45OHYuMDF6TTcgMi4zYy0zLjE0IDAtNS43IDIuNTQtNS43IDUuNjggMCAzLjE0IDIuNTYgNS43IDUuNyA1LjdzNS43LTIuNTUgNS43LTUuN2MwLTMuMTUtMi41Ni01LjY5LTUuNy01LjY5di4wMXpNNyAuOThjMy44NiAwIDcgMy4xNCA3IDdzLTMuMTQgNy03IDctNy0zLjEyLTctNyAzLjE0LTcgNy03eiIgLz48L3N2Zz4=)</span>Por qué igual no te conviene
 
 `https://*.miempresa.com` alcanza a **todos** los subdominios, incluidos los que ya no usás. Un subdominio abandonado que todavía apunta a un servicio dado de baja puede ser reclamado por un tercero y usado para montar tu experiencia de firma. Es el mismo motivo por el que OAuth desaconseja comodines en las URL de redirección.
 
-Cuando el comodín esté disponible, apuntalo a un subdominio dedicado que controles entero —`https://*.clientes.miempresa.com`, no `https://*.miempresa.com`— y revisá periódicamente qué registros DNS existen bajo esa rama.
+Apuntalo a un subdominio dedicado que controles entero —`https://*.clientes.miempresa.com`, no `https://*.miempresa.com`— y revisá periódicamente qué registros DNS existen bajo esa rama.
 
 ### El comodín no aplica a la sesión
 
 Esta es la parte que suele confundir, y conviene tenerla clara antes de integrar.
 
-Declarar dominios y crear una sesión son cosas distintas. Tu backend manda un `allowedOrigin` **concreto** en el cuerpo de cada sesión, y ese valor queda atado a la credencial efímera. Un patrón nunca puede ocupar ese lugar — ni siquiera cuando el comodín esté disponible en la declaración.
+Declarar dominios y crear una sesión son cosas distintas. Tu backend manda un `allowedOrigin` **concreto** en el cuerpo de cada sesión, y ese valor queda atado a la credencial efímera. Un patrón nunca puede ocupar ese lugar, aunque esté registrado en la declaración administrativa.
 
 No es una restricción nuestra: la Hosted UI se comunica con tu página por `postMessage`, y ahí el navegador exige un **origen exacto** como destino. Un `postMessage(mensaje, "*")` entregaría los datos de la sesión a cualquier origen que en ese momento tenga el frame, así que está prohibido explícitamente.
 
@@ -205,7 +205,7 @@ Un **canal** (`preprod`, `dev`) apunta siempre al último set validado de ese am
 Una vez que tu integración es estable, **fijá la versión exacta** en `package.json` y en el lockfile:
 
 ```
-npm install @lakaut/server@0.1.0-rc.34 @lakaut/browser@0.1.0-rc.34
+npm install @lakaut/server@0.1.0-rc.40 @lakaut/browser@0.1.0-rc.40
 ```
 
 Las versiones publicadas son inmutables: una versión exacta te garantiza que el build de hoy y el de dentro de tres meses instalan el mismo código. Un canal, en cambio, se mueve solo cuando Lakaut promueve un set nuevo, y eso puede pasar entre dos builds tuyos sin que cambies nada.
