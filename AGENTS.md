@@ -11,20 +11,18 @@ to *write code* here (naming, types, errors, money, secrets, tests, process).
 
 ## What this is
 
-Lucero is building a provider-agnostic **signing and evidence core**. A client
-product supplies a pre-built PDF and a set of precondition rules; the core gates
-it, seals it, runs a signature ceremony through a provider, ingests the signed
-artefact and assembles a verifiable evidence bundle. The first client product is
-vehicle-loan origination for Argentine dealerships — a *pagaré con garantía
-prendaria*. The provider is Lakaut, an Argentine certifying authority. A second,
-different signing product is expected, which is why the core is a set of
-packages and not an app.
+A **signing and evidence core**. A caller supplies a pre-built PDF and a set of
+precondition rules; the core gates the document, seals it, runs a signature
+ceremony through Lakaut — an Argentine certifying authority, and the only
+provider — ingests the signed artefact and assembles a verifiable evidence
+bundle. The first document is an Argentine *pagaré*; its rule set is
+`packages/rules-pagare-ar`.
 
 The architecture is argued in `docs/research/RESULT-001-core-signing-evidence.md`.
 Read §1 (verdict), §2 (the core) and §3 (constraints) before touching anything
 under `packages/`; most non-obvious decisions in the code trace back there. The
-`ADDENDUM` records what the vendor changed after it was written; RESULT-001
-itself is never edited.
+`ADDENDUM` records what has changed since — vendor drift and product scope;
+RESULT-001 itself is never edited.
 
 ## Layout
 
@@ -33,23 +31,21 @@ apps/                      deployable products (empty; see apps/README.md)
 packages/core/             contracts + error classes. Zero dependencies.
 packages/gate/             PolicyGate engine, InMemoryPolicyRegistry, rule factories
 packages/rules-pagare-ar/  the Argentine pagaré rule set
-docs/research/             RESULT-001 (architecture investigation) + ADDENDUM (rc.40 drift)
-docs/planning/             BACKLOG-001 — 28 tickets, each filed as a GitHub issue
-docs/design/               one design document per non-trivial ticket
+docs/research/             RESULT-001 (architecture investigation) + ADDENDUM (what changed since)
+docs/design/               one design document per non-trivial change
 docs/vendor/lakaut/        21 mirrored Lakaut doc pages + llms.txt, pinned at SDK rc.40
-docs/vendor/prototipo/     the product design prototype and a brief distilled from it
+docs/vendor/prototipo/     the design prototype and a brief distilled from it
 scripts/verify.sh          the one command that must pass on a laptop and in the cloud
 ```
 
-`apps/` vs `packages/` is **deployable vs importable**, not shared vs
-product-specific. `rules-pagare-ar` serves one product and still lives in
-`packages/` because it is a library another pagaré product can import. See
-`apps/README.md` before creating either.
+`apps/` vs `packages/` is **deployable vs importable**: an app has a process, a
+package does not. See `apps/README.md` before creating either.
 
 Dependency direction is strict: `core` imports nothing; `gate` imports `core`;
 `rules-pagare-ar` imports both; apps import packages; nothing in `packages/`
 imports `apps/`. When the Lakaut adapter lands it will be the only package that
-imports `@lakaut/*`, reached through the `SignatureProvider` port (STYLES §2).
+imports `@lakaut/*`, behind the `SignatureProvider` port, so everything else is
+tested without a live call (STYLES §2, §10).
 
 ## Commands
 
@@ -106,14 +102,18 @@ from memory. The vendor's seven non-negotiable rules
 
 We have no Lakaut sandbox or dashboard credentials. Until they exist:
 
-- CORE-23, the multi-party signature spike, cannot run. CORE-24, CORE-25 and
-  CORE-26 are blocked behind it.
+- The multi-party signature question — whether one session can carry more than
+  one signer — cannot be settled, so nothing depending on its answer should be
+  designed yet.
 - The 18-item sandbox verification list in RESULT-001 §6 is unrun.
-- Nothing in Track C (adapter) or Track D (borrower surface) can be tested
-  against a live session.
+- Nothing in the adapter or the signing surface can be tested against a live
+  session.
 
-Production URLs and credentials are `TBD` on the vendor's side as well. Tracks A
-and B (instrument, evidence) depend on nothing Lakaut can change; start there.
+Production URLs and credentials are `TBD` on the vendor's side as well.
+
+Start with the instrument and the evidence bundle instead. They depend on
+nothing Lakaut can change, and they are where the value sits: the precondition
+gate is what makes a document enforceable, and Lakaut never sees it.
 
 ## Environment
 
@@ -123,6 +123,6 @@ reading both. Never copy their contents into a log, a fixture, or a chat.
 
 ## Design documents
 
-A non-trivial ticket gets a design document in `docs/design/` before code; the
-directory's README says what one contains. Decisions that a ticket in
-BACKLOG-001 already made do not need re-deciding — cite the ticket.
+A non-trivial change gets a design document in `docs/design/` before code; the
+directory's README says what one contains. A decision its issue already made
+does not need re-deciding — cite the issue.

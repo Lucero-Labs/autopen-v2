@@ -100,7 +100,7 @@ When two approaches both work, these decide. They override personal preference.
 ### 3.2 Spanish stays Spanish
 
 Argentine legal terms are Spanish wherever they appear — identifiers, rule ids,
-messages, docs: `pagaré`, `prenda`, `lugarDePago`, `integracionDeConsumo`,
+messages, docs: `pagaré`, `lugarDePago`, `integracionDeConsumo`,
 `primerVencimiento`, `cuota`, `liquidación`, `constancia`, `persona física /
 jurídica`. They are terms of art with no English equivalent an Argentine lawyer
 would recognise; a half-translated codebase (`paymentPlace`) is one where nobody
@@ -187,7 +187,7 @@ conventions. A pagaré off by a centavo after 24 cuotas is a document someone
 can challenge in court.
 
 - The rounding policy for derived figures (cuota, costo total, intereses) is
-  written down once and applied everywhere. CORE-01 owns it.
+  written down once and applied everywhere.
 - Arithmetic on money goes through the money type. `amount * rate` on raw
   numbers is review-blocking wherever the result is money.
 
@@ -209,8 +209,7 @@ The vendor's list, plus the webhook secret: API key, `clientToken`, OTP, DNI,
 sexo, PIN, PDF bytes, biometric evidence, JWTs. Not at `debug`, not in a test
 fixture, not in an error message, not pasted into a chat with an agent. This is
 a vendor hard rule (`sdk-integracion__agentes.md`, "Reglas que no se
-negocian"), not a preference. CORE-28 adds a test that these cannot reach a
-sink.
+negocian"), not a preference. A test asserts that they cannot reach a sink.
 
 Safe, and required on every line that touches a ceremony: `environment`,
 `integratorId`, `sessionId`, `documentId`, `correlationId`, `errorCode`,
@@ -269,13 +268,13 @@ direction costs one retry; wrong the other way costs the whole flow.
 - Retry within the step keeps session, document and step, clears only the PIN,
   and prevents double submission.
 - The map is exhaustive over `LakautSdkErrorCode`; a test fails when the SDK
-  adds a code (CORE-18).
+  adds a code.
 
 ### 9.4 Explicit profiles
 
 Sessions always send `authenticationProfileId` explicitly — the default resolves
 differently for `flowType` and `journeyId`. `getCatalog()` is asserted at boot
-rather than hardcoding journey/profile combinations (CORE-14).
+rather than hardcoding journey/profile combinations.
 
 ## 10. Testing
 

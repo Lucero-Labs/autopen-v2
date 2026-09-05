@@ -8,22 +8,16 @@ never depend on apps.
 
 ## What goes here vs. in `packages/`
 
-The test is **deployable or importable**, not *shared* or *product-specific*.
+The test is **deployable or importable**.
 
 | | |
 | --- | --- |
 | `apps/` | Has a process. You start it, deploy it, point a URL at it. |
 | `packages/` | Has no process. Something else imports it. |
 
-So a rule set written for exactly one product — `packages/rules-pagare-ar` — still
-belongs in `packages/`, because it is a library with no runtime and a second
-product doing Argentine pagarés should be able to import it. The vehicle-loan
-origination product that *uses* those rules, with its originador panel and its
-borrower route, is an app.
-
-Getting this backwards is the expensive mistake: burying a reusable rule set
-inside an app means the next product either copies it or reaches across an app
-boundary to get it.
+So `packages/rules-pagare-ar`, a rule set with no runtime, is a package. A
+server that runs those rules through the gate and hands the result to a
+ceremony would be an app.
 
 ## Adding one
 
