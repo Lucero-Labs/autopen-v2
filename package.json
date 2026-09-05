@@ -13,7 +13,7 @@
   },
   "devDependencies": {
     "turbo": "2.10.11",
-    "typescript": "5.9.3",
-    "vitest": "4.1.11"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
