@@ -10,7 +10,7 @@ export type {
   Finding,
   GateVerdict,
   Gate,
-} from "./gate.js";
+} from "./contracts.js";
 
 export {
   CoreError,
