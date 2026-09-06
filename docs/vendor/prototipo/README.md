@@ -1,5 +1,11 @@
 # Prototipo Lucero v2 — Originación vehicular
 
+> **Superseded on 2026-09-05 by `docs/product/`.** The product is no longer
+> vehicle finance and the instrument is no longer a *pagaré con garantía
+> prendaria*. This pair stays at this path because RESULT-001 cites it as
+> `[proto]` and `[brief]` and is never edited. Read it to understand RESULT-001,
+> never as a description of what is being built.
+
 Distilled from `prototipo-lucero-v2.dc.html` (design prototype, 2026-08-16).
 Where this brief and the HTML disagree, **the HTML wins** — read it directly.
 

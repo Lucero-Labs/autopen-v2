@@ -16,7 +16,7 @@ The first document is an Argentine *pagaré*; its rule set is
 | What is the work? | The open GitHub issues |
 | How is a ticket designed before coding? | `docs/design/` |
 | What does the vendor actually say? | `docs/vendor/lakaut/` — a faithful mirror at SDK `0.1.0-rc.40` |
-| What did the prototype look like? | `docs/vendor/prototipo/` |
+| What is being built, as designed? | `docs/product/` — prototype + brief |
 | How do I work in this repo? | [`AGENTS.md`](AGENTS.md) (the repo), [`STYLES.md`](STYLES.md) (the code) |
 
 ## What exists
