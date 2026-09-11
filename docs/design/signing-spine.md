@@ -54,18 +54,39 @@ Everything on §3.10's Lakaut-specific list — RENAPER, `flowType`, `journeyId`
 810 px iframe, the HMAC scheme — lives behind it. `@lakaut/*` appears in the
 adapter package and nowhere else (STYLES §2).
 
-### 2.4 The core does not model national identity
+### 2.4 The core carries the subject, because binding requires it
 
-`identitySubject { dni, sexo }` is Lakaut-shaped, is on the never-log list
-(STYLES §8.1) and must never reach the browser (§8.2). Rather than carry it and
-guard it everywhere, the core carries an opaque product-supplied reference and
-the adapter resolves it. A DNI that is never in `core` cannot leak from `core`.
+An earlier draft of this document kept identity out of the core entirely: an
+opaque product reference, resolved by the adapter, on the reasoning that a DNI
+never in `core` cannot leak from `core`. That is reversed here, and the reason is
+not convenience.
 
-*Cost, stated plainly:* the core cannot answer "who signed this" on its own — it
-holds a reference and a certificate fingerprint. Evidence assembly resolves the
-reference through the product. That is the right trade while identity is
-jurisdiction-specific (§2.6: generalise to "identity assurance with named method
-and evidence", not to RENAPER).
+Verification returns `signerCertificateFingerprint` and an opaque
+`certificateRef` — no name, no DNI — and event payloads carry none either
+(`[eventos]`: *"Los payloads no contienen OTP, DNI, email, PIN, token, evidencia
+biométrica ni PDF"*). Lakaut confirms an identity; it never discloses one. So
+**nothing compares the DNI printed in the instrument against the identity that
+signed it.** A signer can complete a valid ceremony over a document naming
+somebody else, and every artefact we hold will verify.
+
+The one mechanism that closes this is `identitySubject` at session creation.
+Pre-supplying it *"suppresses the capture step but not the verification"*
+(§3.6), so the provider verifies against **our** value and a mismatch fails the
+ceremony instead of producing a good signature over a wrong name. For an
+instrument whose enforceability rests on who signed it, that is not optional —
+which means the core must carry a subject the adapter can bind, not a reference
+only the product can resolve.
+
+The original concern stands and is answered structurally rather than by absence
+(§3, `SignerSubject`): the type is branded, redacts on serialisation, and is
+excluded from `CeremonyHandle` by construction, so §8.2's rule that it must never
+reach the browser is a type error rather than a review note.
+
+*Cost, stated plainly:* a DNI now lives in `core` and in session-creation
+payloads, which puts it squarely on the never-log list (STYLES §8.1). And
+`identitySubject` requires registral `sexo` — *"El contrato actual admite sexo
+registral `M` o `F`… No envíes valores diferentes"* (`[identidad]`) — a field the
+product's form does not collect today and must.
 
 ### 2.5 One ceremony, one signer; only the backend closes it
 
@@ -114,11 +135,26 @@ export interface SealedDocument {
 
 export type AssuranceLevel = "advanced" | "qualified";
 
-/** `subject` is opaque to the core; the adapter resolves it (§2.4). */
+/**
+ * The identity the signature must be bound to, so a ceremony cannot produce a
+ * valid signature over a document naming somebody else (§2.4).
+ *
+ * Never logged and never serialised in the clear: `toJSON` and `toString`
+ * redact, so a subject reaching a sink is inert rather than a disclosure
+ * (STYLES §8.1). `sexo` is registral and the provider admits only `M` or `F`.
+ */
+export interface SignerSubject {
+  readonly nationalId: NationalId;
+  readonly sexo: "M" | "F";
+  toJSON(): { readonly nationalId: "[redacted]"; readonly sexo: "[redacted]" };
+}
+
+export type NationalId = string & { readonly __brand: "NationalId" };
+
 export interface SignerRole {
   readonly role: string; // product vocabulary — "suscriptor"
   readonly assurance: AssuranceLevel;
-  readonly subject: { readonly ref: string };
+  readonly subject: SignerSubject;
 }
 
 /** Produced only by the adapter. Never hand-built (STYLES §8.2). */
@@ -126,6 +162,11 @@ export type ProviderRendererContext = {
   readonly __brand: "ProviderRendererContext";
 };
 
+/**
+ * What the product delivers to the signer. Neither variant can carry a
+ * `SignerSubject`: §8.2 bars it from the browser, and the type makes that
+ * structural rather than a rule someone has to remember.
+ */
 export type CeremonyHandle =
   | { readonly kind: "hosted-url"; readonly url: string }
   | { readonly kind: "embedded"; readonly context: ProviderRendererContext };
@@ -205,6 +246,11 @@ keeps zero dependencies. The adapter implements the port; nothing else imports
   never falls back to trusting the delivered bytes.
 - `reconcile` is idempotent on the webhook envelope's `idempotencyKey`. An event
   for an unknown ceremony is persisted and alerted, never dropped (STYLES §0.1).
+- A ceremony whose verified identity does not match the `SignerSubject` it was
+  opened with fails. The signature is not accepted, the artefact is not
+  archived, and the instrument does not advance — an identity mismatch is the
+  failure this binding exists to produce, so it must never be recoverable by
+  retrying without it.
 - An unrecognised provider code is `retry-in-step` (STYLES §9.3) — the one place
   the permissive direction is correct, because escalating costs the whole flow.
 - `signed_document_delivery_failed` means the document **is signed**. Reconcile;
@@ -219,6 +265,9 @@ keeps zero dependencies. The adapter implements the port; nothing else imports
   leaves the ceremony `pending` until `reconcile` reads authoritative status.
   This is the test that protects §0.2, and it is the one most likely to be
   quietly deleted later.
+- **A subject never reaches a sink in the clear:** serialising a `SignerRole`
+  through `JSON.stringify` yields redacted values, and a `CeremonyHandle` cannot
+  be constructed carrying one.
 - **Webhook idempotency:** the same envelope twice produces one transition.
 - **Custody failure archives nothing.**
 - Recorded fixtures only; no live `@lakaut/*` calls (STYLES §10).
