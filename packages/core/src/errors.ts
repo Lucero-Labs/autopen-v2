@@ -52,3 +52,59 @@ export class RuleEvaluationError extends CoreError {
     super(`Rule "${ruleId}" threw during evaluation`);
   }
 }
+
+/**
+ * A stored document's hash disagrees with the id it is filed under.
+ *
+ * `seal` derives the id from the content, so a caller cannot cause this. It
+ * means the document store returned a record that does not match its key, and
+ * the safe response is to refuse rather than proceed on bytes we cannot vouch
+ * for (§0.1).
+ */
+export class SealConflictError extends CoreError {
+  constructor(
+    readonly documentId: string,
+    readonly storedHash: string,
+    readonly computedHash: string,
+  ) {
+    super(
+      `Document "${documentId}" is stored under hash "${storedHash}" but hashes to "${computedHash}"`,
+    );
+  }
+}
+
+/** No WebCrypto on this runtime, so nothing can be sealed or verified. */
+export class HashUnavailableError extends CoreError {
+  constructor() {
+    super("globalThis.crypto.subtle is unavailable, so content cannot be hashed");
+  }
+}
+
+/** A ceremony was asked about that the ledger has no record of. */
+export class CeremonyNotFoundError extends CoreError {
+  constructor(readonly ceremonyId: string) {
+    super(`No ceremony recorded for "${ceremonyId}"`);
+  }
+}
+
+/** A document was referenced that was never sealed. */
+export class DocumentNotSealedError extends CoreError {
+  constructor(readonly documentId: string) {
+    super(`No sealed document for "${documentId}"`);
+  }
+}
+
+/**
+ * Custody did not complete, so the artefact is not evidence.
+ *
+ * Carries the provider's error code when it has one. The artefact is never
+ * archived on this path and the binding is not registered (STYLES §9.5).
+ */
+export class CustodyFailedError extends CoreError {
+  constructor(
+    readonly documentId: string,
+    override readonly cause: unknown,
+  ) {
+    super(`Custody failed for document "${documentId}"`);
+  }
+}

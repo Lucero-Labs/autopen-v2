@@ -37,9 +37,10 @@ RESULT-001 itself is never edited.
 
 ```
 apps/                      deployable products (empty; see apps/README.md)
-packages/core/             contracts + error classes. Zero dependencies.
+packages/core/             contracts + error classes + the signing spine. Zero dependencies.
 packages/gate/             PolicyGate engine, InMemoryPolicyRegistry, rule factories
 packages/rules-pagare-ar/  the Argentine pagaré rule set
+packages/adapter-lakaut/   the Lakaut provider. The only package importing @lakaut/*
 docs/research/             RESULT-001 (architecture investigation) + ADDENDUM (what changed since)
 docs/design/               one design document per non-trivial change
 docs/vendor/lakaut/        21 mirrored Lakaut doc pages + llms.txt, pinned at SDK rc.40
@@ -52,10 +53,10 @@ scripts/verify.sh          the one command that must pass on a laptop and in the
 package does not. See `apps/README.md` before creating either.
 
 Dependency direction is strict: `core` imports nothing; `gate` imports `core`;
-`rules-pagare-ar` imports both; apps import packages; nothing in `packages/`
-imports `apps/`. When the Lakaut adapter lands it will be the only package that
-imports `@lakaut/*`, behind the `SignatureProvider` port, so everything else is
-tested without a live call (STYLES §2, §10).
+`rules-pagare-ar` imports both; `adapter-lakaut` imports `core` and `@lakaut/*`
+and is the only package that may; apps import packages; nothing in `packages/`
+imports `apps/`. The adapter sits behind the `SignatureProvider` port, so
+everything else is tested without a live call (STYLES §2, §10).
 
 ## Commands
 
