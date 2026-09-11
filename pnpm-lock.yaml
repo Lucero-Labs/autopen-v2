@@ -30,6 +30,28 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(vite@8.2.2)
 
+  packages/adapter-lakaut:
+    dependencies:
+      '@autopen/core':
+        specifier: workspace:*
+        version: link:../core
+      '@lakaut/browser':
+        specifier: 0.1.0-rc.40
+        version: 0.1.0-rc.40(html-entities@2.6.0)
+      '@lakaut/server':
+        specifier: 0.1.0-rc.40
+        version: 0.1.0-rc.40(html-entities@2.6.0)
+      '@lakaut/shared-contracts':
+        specifier: 0.1.0-rc.40
+        version: 0.1.0-rc.40
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(vite@8.2.2)
+
   packages/core:
     devDependencies:
       typescript:
@@ -123,11 +145,34 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@cantoo/pdf-lib@2.9.1':
+    resolution: {integrity: sha512-wAKXXDjp5lO0wS6d+k0FRpmWsULb95WhHKYx2fonTbv4zIfuIdCBz2nyTVVDGJpNDLl6o4w9aSTxQisBvvd60A==}
+    peerDependencies:
+      html-entities: ^2.3.2
+
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
 
+  '@lakaut/browser@0.1.0-rc.40':
+    resolution: {integrity: sha512-on38wImR1ikJ4odYsBX4ZpdF/W1crvwIVUHEZc3yoxjA5c+M0kH9xBRuvgD/oNRUGzokc8k/Dbt9RfFUYPdkSA==}
+    engines: {node: '>=20'}
+
+  '@lakaut/server@0.1.0-rc.40':
+    resolution: {integrity: sha512-42dAGVil2IF8YbXtYS77vmyTGB3ggVBRWpzuFliaY7InVg0F4M1KiOlUicZ0I+ei/FK6oCPrgFiFhtEVxRe0yA==}
+    engines: {node: '>=20'}
+
+  '@lakaut/shared-contracts@0.1.0-rc.40':
+    resolution: {integrity: sha512-EKKqsLyE6geI6IoLol6R5zusXvr411mOjLEk9+vY7E3A9qnGhZ9cYDr9iZsB6Qklkp1VtaQNiAch28xwW5VIGQ==}
+    engines: {node: '>=20'}
+
   '@oxc-project/types@0.146.0':
     resolution: {integrity: sha512-XC0QsnnhVe7sLIWmYmdPw7x5P0h4W8vUU3Nv1ySgWXtvCz8NizoAEpGXA0sOYoJQV2Rl13LgURAHQ5cI5ILCSA==}
+
+  '@pdf-lib/standard-fonts@1.0.0':
+    resolution: {integrity: sha512-hU30BK9IUN/su0Mn9VdlVKsWBS6GyhVfqjwl1FjZN4TxP6cCw0jP2w7V3Hf5uX7M0AZJ16vey9yE0ny7Sa59ZA==}
+
+  '@pdf-lib/upng@1.0.1':
+    resolution: {integrity: sha512-dQK2FUMQtowVP00mtIksrlZhdFXQZPC+taih1q4CvPZ5vqdxR/LKBaFg0oAfzd1GlHZXXSPdQfzQnt+ViGvEIQ==}
 
   '@rolldown/binding-android-arm-eabi@1.2.5':
     resolution: {integrity: sha512-DLe/i+l8ynIBY7XEQ191TeZvCoowIGa18R+dIV30GW7DiOtp74i/xX8hs8GUjW5ARV7VZuie3d6AumSmCwbeRA==}
@@ -301,6 +346,20 @@ packages:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
     engines: {node: '>=18'}
 
+  color-convert@2.0.1:
+    resolution: {integrity: sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==}
+    engines: {node: '>=7.0.0'}
+
+  color-name@1.1.4:
+    resolution: {integrity: sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA==}
+
+  color-string@1.9.1:
+    resolution: {integrity: sha512-shrVawQFojnZv6xM40anx4CkoDP+fZsw/ZerEMsW/pyzsRbElpsL/DBVW7q3ExxwusdNXI3lXpuhEZkzs8p5Eg==}
+
+  color@4.2.3:
+    resolution: {integrity: sha512-1rXeuUUiGGrykh+CeBdu5Ie7OJwinCgQY0bc7GCRxy5xVHy+moaqkpL/jqQq0MtQOeYcrqEz4abc5f0KtU7W4A==}
+    engines: {node: '>=12.5.0'}
+
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
 
@@ -331,6 +390,12 @@ packages:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
+
+  html-entities@2.6.0:
+    resolution: {integrity: sha512-kig+rMn/QOVRvr7c86gQ8lWXq+Hkv6CbAH1hLu+RG338StTpE8Z0b44SDVaqVu7HGKf27frdmUYEs9hTUX/cLQ==}
+
+  is-arrayish@0.3.4:
+    resolution: {integrity: sha512-m6UrgzFVUYawGBh1dUsWR5M2Clqic9RVXC/9f8ceNlv2IcO9j9J/z8UoCLPqtsPBFNzEpfR3xftohbfqDx8EQA==}
 
   lightningcss-android-arm64@1.33.0:
     resolution: {integrity: sha512-gEpRTalKdosp4Bb8qWtc2iOgE5SeIHlpS1up9bFq2wAyYhl1UdTObYiHe98zEM9SQvSoqQZ1IQD0JNpg3Ml5pg==}
@@ -410,9 +475,18 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
+  node-html-better-parser@1.5.9:
+    resolution: {integrity: sha512-z1I5UINMezJXYL9cH3h0a9KBth2G978gSLlfkpQ+CQzzVHVQy9gpARgm9eDsz1O4gn1HtgUqjdAIYxKFZm6uHQ==}
+
   obug@2.1.4:
     resolution: {integrity: sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA==}
     engines: {node: '>=12.20.0'}
+
+  pako@1.0.11:
+    resolution: {integrity: sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==}
+
+  pako@2.2.0:
+    resolution: {integrity: sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==}
 
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
@@ -435,6 +509,9 @@ packages:
 
   siginfo@2.0.0:
     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
+
+  simple-swizzle@0.2.4:
+    resolution: {integrity: sha512-nAu1WFPQSMNr2Zn9PGSZK9AGn4t/y97lEm+MXTtUDwfP0ksAIX4nO+6ruD9Jwut4C49SB1Ws+fbXsm/yScWOHw==}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -460,6 +537,9 @@ packages:
   tinyrainbow@3.1.1:
     resolution: {integrity: sha512-yau8yJdTt989Mm0Bd/236QnzEiPf2xLLTqUZRUJOo/3CB078LSwzei343DgtJVmfJKJE3TMINY1u42SQsP6mXw==}
     engines: {node: '>=14.0.0'}
+
+  tslib@2.8.1:
+    resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
   turbo@2.10.11:
     resolution: {integrity: sha512-yQfwQVoRXwOuyX1LxiJFBFNg6VfuYh+/RyZLd82+isgyLkBXw3S5XRRzvcck1FAjSCG5sVyLd+O1eDMvYa3J7g==}
@@ -596,9 +676,43 @@ snapshots:
   '@biomejs/cli-win32-x64@2.5.11':
     optional: true
 
+  '@cantoo/pdf-lib@2.9.1(html-entities@2.6.0)':
+    dependencies:
+      '@pdf-lib/standard-fonts': 1.0.0
+      '@pdf-lib/upng': 1.0.1
+      color: 4.2.3
+      html-entities: 2.6.0
+      node-html-better-parser: 1.5.9
+      pako: 2.2.0
+      tslib: 2.8.1
+
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
+  '@lakaut/browser@0.1.0-rc.40(html-entities@2.6.0)':
+    dependencies:
+      '@cantoo/pdf-lib': 2.9.1(html-entities@2.6.0)
+      '@lakaut/shared-contracts': 0.1.0-rc.40
+    transitivePeerDependencies:
+      - html-entities
+
+  '@lakaut/server@0.1.0-rc.40(html-entities@2.6.0)':
+    dependencies:
+      '@cantoo/pdf-lib': 2.9.1(html-entities@2.6.0)
+      '@lakaut/shared-contracts': 0.1.0-rc.40
+    transitivePeerDependencies:
+      - html-entities
+
+  '@lakaut/shared-contracts@0.1.0-rc.40': {}
+
   '@oxc-project/types@0.146.0': {}
+
+  '@pdf-lib/standard-fonts@1.0.0':
+    dependencies:
+      pako: 1.0.11
+
+  '@pdf-lib/upng@1.0.1':
+    dependencies:
+      pako: 1.0.11
 
   '@rolldown/binding-android-arm-eabi@1.2.5':
     optional: true
@@ -721,6 +835,22 @@ snapshots:
 
   chai@6.2.2: {}
 
+  color-convert@2.0.1:
+    dependencies:
+      color-name: 1.1.4
+
+  color-name@1.1.4: {}
+
+  color-string@1.9.1:
+    dependencies:
+      color-name: 1.1.4
+      simple-swizzle: 0.2.4
+
+  color@4.2.3:
+    dependencies:
+      color-convert: 2.0.1
+      color-string: 1.9.1
+
   convert-source-map@2.0.0: {}
 
   detect-libc@2.1.2: {}
@@ -739,6 +869,10 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  html-entities@2.6.0: {}
+
+  is-arrayish@0.3.4: {}
 
   lightningcss-android-arm64@1.33.0:
     optional: true
@@ -795,7 +929,15 @@ snapshots:
 
   nanoid@3.3.18: {}
 
+  node-html-better-parser@1.5.9:
+    dependencies:
+      html-entities: 2.6.0
+
   obug@2.1.4: {}
+
+  pako@1.0.11: {}
+
+  pako@2.2.0: {}
 
   pathe@2.0.3: {}
 
@@ -832,6 +974,10 @@ snapshots:
 
   siginfo@2.0.0: {}
 
+  simple-swizzle@0.2.4:
+    dependencies:
+      is-arrayish: 0.3.4
+
   source-map-js@1.2.1: {}
 
   stackback@0.0.2: {}
@@ -848,6 +994,8 @@ snapshots:
       picomatch: 4.0.5
 
   tinyrainbow@3.1.1: {}
+
+  tslib@2.8.1: {}
 
   turbo@2.10.11:
     optionalDependencies:
