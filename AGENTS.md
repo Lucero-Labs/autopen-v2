@@ -18,6 +18,15 @@ provider — ingests the signed artefact and assembles a verifiable evidence
 bundle. The first document is an Argentine *pagaré*; its rule set is
 `packages/rules-pagare-ar`.
 
+**Direction.** The core is expected to be consumed as an API by more than one
+product. Lakaut has no tenant dimension — one `integratorId`, one webhook URL per
+environment, and no tenant field in any event (RESULT-001 §3.4) — so
+multi-tenancy is entirely ours. Two consequences to design around rather than
+discover: every consumer's browser origin must be declared in our single Lakaut
+dashboard, and every webhook for every consumer arrives at one endpoint, routed
+by `sessionId` against our own records. Contracted scope is per-integration, so
+every consumer shares the one above.
+
 The architecture is argued in `docs/research/RESULT-001-core-signing-evidence.md`.
 Read §1 (verdict), §2 (the core) and §3 (constraints) before touching anything
 under `packages/`; most non-obvious decisions in the code trace back there. The
@@ -99,22 +108,29 @@ from memory. The vendor's seven non-negotiable rules
 (`sdk-integracion__agentes.md`) are restated with their consequences in STYLES
 §8–§9.
 
-### Blocked on credentials
+### Vendor access
 
-We have no Lakaut sandbox or dashboard credentials. Until they exist:
+Preproduction is live since 2026-09-11 — integration `lucerosa`, environment
+`sandbox`, origin `https://dev.lucerolabs.xyz` declared. Contracted scope is
+`Onboarding` and `Onboarding + Firma` with `auth.email-sms.v1` only, and `Firma`
+with all three profiles. Production URLs and credentials are still `TBD` on the
+vendor's side.
 
-- The multi-party signature question — whether one session can carry more than
-  one signer — cannot be settled, so nothing depending on its answer should be
-  designed yet.
-- The 18-item sandbox verification list in RESULT-001 §6 is unrun.
-- Nothing in the adapter or the signing surface can be tested against a live
-  session.
+This unblocks the 18-item verification list in RESULT-001 §6 and the adapter.
+The multi-party signature question that used to gate several of them was settled
+affirmatively by rc.40 (`ADDENDUM` §1) and is no longer open.
 
-Production URLs and credentials are `TBD` on the vendor's side as well.
+**Preproduction is not a scratch environment.** A Lakaut account is one per DNI,
+the signing PIN is per-signature with no documented reset, and
+`SIGN_PIN_RATE_LIMITED` is a real code. A test identity whose PIN locks may not
+be replaceable by the same person. Whether preproduction accepts a synthetic DNI
+or demands a real one with biometrics is undocumented and unrun. Treat onboarding
+a test subject as possibly unrepeatable, and run PIN-bearing experiments last.
 
-Start with the instrument and the evidence bundle instead. They depend on
-nothing Lakaut can change, and they are where the value sits: the precondition
-gate is what makes a document enforceable, and Lakaut never sees it.
+Verify the installed SDK version before trusting any vendor claim in this repo:
+`docs/vendor/lakaut/` is pinned at `0.1.0-rc.40`, and the dashboard installs
+from the `@preprod` tag. If the tag resolves to something else, every
+`[Documented:]` citation here is provisional until drift is re-checked.
 
 ## Environment
 

@@ -32,9 +32,10 @@ apps/                      deployable products (empty so far — see apps/README
 knowing nothing about what it is gating. `@autopen/rules-pagare-ar` is the first
 policy registered with it; `packages/gate/README.md` shows how to compose one.
 
-The Lakaut adapter, the seal operation, ingest and the evidence bundle are on
-the backlog. The multi-party signature question that shapes several of them is
-blocked on sandbox credentials (AGENTS.md, "Blocked on credentials").
+The Lakaut adapter, the seal operation, ingest and the evidence bundle are not
+built yet; `docs/design/` holds the designs that exist, and the open GitHub
+issues are the plan. Preproduction access is live — see AGENTS.md, "Vendor
+access", including why it is not a scratch environment.
 
 ## Running it
 

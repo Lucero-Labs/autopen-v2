@@ -79,8 +79,11 @@ Presence is therefore not enough: a province-only value must fail.
 > acreedores que sean entidad financiera de la ley 21.526 o para pagarés
 > negociados en mercados CNV. Revisá tu encuadre con tu asesoría legal.
 
-**Enviado.** Hand-off by WhatsApp carrying a link of the form
-`https://firma.ejemplo.com/f/8H2K9Q`.
+**Enviado.** A link of the form `https://firma.ejemplo.com/f/8H2K9Q` is minted
+and the operator **copies it and sends it by hand**. There is no WhatsApp
+integration and none is planned, so RESULT-001 §2.4's "delivery channel"
+extension point is not a seam the core has to provide: it mints a handle, and
+delivery leaves the system entirely.
 
 ## Act 2 — Deudor firma
 
@@ -156,6 +159,34 @@ on a test pass, so they are filed rather than made:
    debtor data yet — origination and signing are two gates at two moments.
 5. The art. 101 checklist has seven items against the policy's three rules.
 
-The *nota de encuadre* above is a question for counsel before any of this is
-settled, and it is the concrete instance of the named-reviewer requirement in
-STYLES §10.1.
+## Two properties of the design that are not obvious
+
+**Lakaut confirms an identity; it never discloses one.** Verification returns
+`signerCertificateFingerprint` and an opaque `certificateRef` — no name, no DNI,
+no domicilio — and event payloads carry none either
+(`[eventos]`: *"Los payloads no contienen OTP, DNI, email, PIN, token, evidencia
+biométrica ni PDF"*). So the suscriptor supplies their own identity data
+permanently, not only until an integration exists. The consequence to design for:
+nothing compares the DNI printed in the pagaré against the identity that signed
+it. Passing `identitySubject` at session creation is what binds them — it
+*"suppresses the capture step but not the verification"*, so Lakaut verifies
+against our value and a mismatch fails the ceremony instead of producing a valid
+signature over the wrong name. It also requires registral `sexo`, which the
+debtor's form does not collect.
+
+**The link is the whole authorisation.** It is delivered by hand through a
+channel that forwards and screenshots, and whoever holds it reaches a signing
+surface. The prototype's `8H2K9Q` is six characters — enumerable by anyone who
+finds the endpoint. Real entropy, an expiry and single use are required before
+this is in front of a borrower.
+
+## The legal question, stated honestly
+
+The *nota de encuadre* above has **not been checked against the statute by
+anyone**. It is an annotation in the design, not a legal finding: no one has read
+art. 101 inc. g), and a qualified signature under Ley 25.506 carries the same
+legal effect as a handwritten one, so the clause may describe a particular regime
+rather than an exclusion. Lakaut sells qualified signatures to Argentine lenders
+and is the cheaper first source; counsel is the second. Until one of them answers,
+this is an open question and not a constraint — and it is the concrete instance
+of the named-reviewer requirement in STYLES §10.1.
