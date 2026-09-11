@@ -276,6 +276,50 @@ Sessions always send `authenticationProfileId` explicitly — the default resolv
 differently for `flowType` and `journeyId`. `getCatalog()` is asserted at boot
 rather than hardcoding journey/profile combinations.
 
+### 9.5 Custody completes before the binding
+
+Under the `signed-document-reconciliation:1.2` contract, the composite operation
+verifies, then runs a custody callback, then registers the binding — and *"el
+callback debe terminar la custodia durable antes del binding"*
+(`sdk-integracion__documentos-firma.md`). The ordering is the invariant, not an
+implementation detail.
+
+It decides where custody can live. Archiving after the ingest call returns is
+too late: the binding already exists, and an artefact bound but unarchived is a
+signed document we cannot produce. So the custody sink is a parameter that
+crosses the provider port — the adapter must never own the evidence store, or
+`@lakaut/*` ends up holding our archive (§2).
+
+- A custody sink that rejects cancels the binding. Never bind and then report
+  success.
+- A replay with identical inputs returns the original binding; the same
+  identifiers with different hashes conflict; a failure never authorises another
+  signature. That is §9.2 restated by the vendor.
+- `auth.document.signed` upgrades from `1.1.0` to `1.2.0` only once the artefact
+  is `BOUND`. The two are never both emitted for one signature and there is no
+  backfill, so a handler that accepts one version silently misses the other.
+- The low-level path, `verifySignedPdfArtifact`, takes three positional
+  arguments rather than one object, and its supplied `OpenSslCmsVerifier` shells
+  out — choosing it puts `openssl` on the backend's deployment requirements.
+  The composite lane does not.
+
+### 9.6 Some fields compile, validate, and are discarded
+
+`CreateSessionInput` declares `clientContext`, `idempotencyKey` and
+`requestedTtlSeconds`, but *"el transporte HTTP no los serializa y el backend
+tampoco los conoce. Compilan, se validan y se descartan"*
+(`sdk-integracion__backend-sesiones.md`).
+
+Session idempotency is therefore ours and is enforced before `createSession` is
+called. Relying on that field produces duplicate sessions with no error anywhere
+— the type checks, the call succeeds, and nothing indicates the value never
+left the process. Correlate with `externalUserRef` and the returned
+`correlationId`, both of which do travel.
+
+The `idempotencyKey` on the artefact-binding call in §9.5 is a different field
+and does work. Type-level presence is not evidence that a field is sent; the
+vendor documentation is.
+
 ## 10. Testing
 
 - vitest, in `test/*.test.ts`, named for the module or surface under test and
