@@ -49,6 +49,8 @@ build for a case that no longer has an example.
 ### 2.3 The provider port is three methods
 
 Per §2.4 and §3.10: `openCeremony`, `authoritativeStatus`, `verifyArtifact`.
+`verifyArtifact` takes a custody sink as well as bytes, for the ordering reason
+in §2.7.
 Everything on §3.10's Lakaut-specific list — RENAPER, `flowType`, `journeyId`,
 `identitySubject`, PIN semantics, the error taxonomy, `toRendererContext`, the
 810 px iframe, the HMAC scheme — lives behind it. `@lakaut/*` appears in the
@@ -106,6 +108,68 @@ as proof.
 The port surfaces a `disposition`, not a provider code. The three-way split and
 the unknown-code default live in the adapter (STYLES §9.3), so the core never
 learns Lakaut's taxonomy and a provider swap does not touch it.
+
+### 2.7 `ingest` is the 1.2 binding lane, and custody crosses the port
+
+rc.40 added an opt-in reconciliation contract, and `ADDENDUM` §4 concluded the
+port shape survives it while the default implementation should be the new lane.
+That is right, with one correction the port as drafted cannot express.
+
+The composite operation runs verification, **then a custody callback, then the
+binding** — in that order, server-to-server:
+
+```ts
+await sessions.verifyAndAcknowledgeSignedArtifact({
+  artifact,
+  idempotencyKey: `${artifact.sessionId}:${artifact.documentId}:custody`,
+  correlationId,
+  custody: async (verifiedArtifact, evidence) => { /* durable custody here */ },
+});
+```
+
+*"El callback debe terminar la custodia durable antes del binding"*
+(`sdk-integracion__documentos-firma.md` §"Custodia y binding 1.2"). That single
+sentence decides where custody lives. Archiving after `ingest` returns is too
+late — the binding is already registered. Letting the adapter archive puts our
+evidence store inside the vendor package, which §2.3 exists to prevent. So the
+custody sink is a parameter of the port:
+
+- `verifyArtifact(documentId, bytes, custody)` on `SignatureProvider`
+- `ingest(documentId, bytes, custody)` on `SigningCore`
+
+The sink receives our `VerifiedArtifact`, never Lakaut's evidence object. The
+adapter maps one to the other, so the core still never learns the provider's
+shapes.
+
+**The ordering is the invariant.** A replay with identical inputs returns the
+original binding; the same identifiers with different hashes conflict; a failed
+custody never authorises another signature. That is §9.2 restated by the vendor:
+the pairing is permanent, and a correction is a new instrument.
+
+**The capability is declared at session creation**, not at ingest —
+`capabilities: ["signed-document-reconciliation:1.2"]` is an optional field on
+`CreateSessionInput`. The adapter's `openCeremony` sends it; the core does not
+know the string exists.
+
+**Receivers must accept both event versions.** `auth.document.signed` only
+upgrades from `1.1.0` to `1.2.0` once the artefact is `BOUND`, adding
+`signedContentHash`, `finalPdfHash`, `artifactBindingStatus` and `bindingId`.
+The two are never both emitted for one signature and there is no backfill, so
+during migration a handler that accepts only one will silently miss the other.
+
+**A trap worth naming, because it compiles.** `CreateSessionInput` still
+declares `clientContext`, `idempotencyKey` and `requestedTtlSeconds`, but *"el
+transporte HTTP no los serializa y el backend tampoco los conoce. Compilan, se
+validan y se descartan"* (`sdk-integracion__backend-sesiones.md`). Session
+idempotency is therefore ours and must be solved before `createSession` is
+called. The `idempotencyKey` in the binding call above is a different field and
+does work.
+
+**One deployment constraint.** The low-level path, `verifySignedPdfArtifact`,
+remains available for controlling verification and custody separately — three
+positional arguments, not one object. Its supplied `OpenSslCmsVerifier` shells
+out, so it requires `openssl` on the backend. Anything choosing that path
+inherits the dependency; the composite lane does not.
 
 ## 3 · Types
 
@@ -214,18 +278,34 @@ export interface VerifiedArtifact {
   readonly verifiedAt: string;
 }
 
+/**
+ * Durable custody, invoked between verification and binding.
+ *
+ * It must resolve before the provider registers the binding (§2.7). Rejecting
+ * cancels the binding rather than leaving an artefact bound but unarchived.
+ */
+export type CustodySink = (artifact: VerifiedArtifact) => Promise<void>;
+
 /** The only seam a provider sits behind. Implemented once, in the adapter. */
 export interface SignatureProvider {
   openCeremony(document: SealedDocument, role: SignerRole): Promise<Ceremony>;
   authoritativeStatus(ceremonyId: CeremonyId): Promise<CeremonyStatus>;
-  verifyArtifact(documentId: DocumentId, bytes: Uint8Array): Promise<VerifiedArtifact>;
+  verifyArtifact(
+    documentId: DocumentId,
+    bytes: Uint8Array,
+    custody: CustodySink,
+  ): Promise<VerifiedArtifact>;
 }
 
 /** What a client product drives. Takes the port as a parameter (STYLES §2). */
 export interface SigningCore {
   seal(bytes: Uint8Array, templateRef: TemplateRef): Promise<SealedDocument>;
   openCeremony(document: SealedDocument, role: SignerRole): Promise<Ceremony>;
-  ingest(documentId: DocumentId, bytes: Uint8Array): Promise<VerifiedArtifact>;
+  ingest(
+    documentId: DocumentId,
+    bytes: Uint8Array,
+    custody: CustodySink,
+  ): Promise<VerifiedArtifact>;
   reconcile(ceremonyId: CeremonyId): Promise<CeremonyStatus>;
 }
 ```
@@ -246,6 +326,11 @@ keeps zero dependencies. The adapter implements the port; nothing else imports
   never falls back to trusting the delivered bytes.
 - `reconcile` is idempotent on the webhook envelope's `idempotencyKey`. An event
   for an unknown ceremony is persisted and alerted, never dropped (STYLES §0.1).
+- A custody sink that rejects cancels the binding (§2.7). An artefact bound but
+  unarchived is the state this ordering exists to make unreachable, so `ingest`
+  propagates the failure rather than binding anyway and reporting success.
+- Session idempotency is enforced before `createSession`, never by its
+  `idempotencyKey` field, which the transport discards (§2.7).
 - A ceremony whose verified identity does not match the `SignerSubject` it was
   opened with fails. The signature is not accepted, the artefact is not
   archived, and the instrument does not advance — an identity mismatch is the
