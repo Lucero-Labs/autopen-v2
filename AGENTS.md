@@ -123,9 +123,23 @@ affirmatively by rc.40 (`ADDENDUM` §1) and is no longer open.
 **Preproduction is not a scratch environment.** A Lakaut account is one per DNI,
 the signing PIN is per-signature with no documented reset, and
 `SIGN_PIN_RATE_LIMITED` is a real code. A test identity whose PIN locks may not
-be replaceable by the same person. Whether preproduction accepts a synthetic DNI
-or demands a real one with biometrics is undocumented and unrun. Treat onboarding
-a test subject as possibly unrepeatable, and run PIN-bearing experiments last.
+be replaceable by the same person.
+
+Whether a synthetic DNI passes is the unresolved part, and the mirror argues both
+ways. The testing checklist closes with *«Usá usuarios y documentos sintéticos o
+autorizados para pruebas»* (`sdk-integracion__ambientes-versionado.md`). But
+`ONBOARDING` runs identity validation with Veriff and data validation against
+RENAPER as steps 4 and 5, and *«si DNI y sexo fueron proporcionados por el
+backend, el paso de captura se omite, pero la validación de identidad y RENAPER
+se realiza igualmente»* (`sdk-integracion__flujos-identidad.md`). Either
+preproduction stubs both providers, or *«sintéticos»* covers the documents and
+*«autorizados»* covers the people. Ask before assuming; the readings differ by
+whether every test signer has to be a consenting human.
+
+Treat onboarding a test subject as possibly unrepeatable, and run PIN-bearing
+experiments last. `sessions.getSigningEligibility({ externalUserRef, email })` is
+the one probe that costs nothing: no session, no PIN, no certificate, and it
+answers whether an identity already holds one.
 
 Verify the installed SDK version before trusting any vendor claim in this repo:
 `docs/vendor/lakaut/` is pinned at `0.1.0-rc.40`, and the dashboard installs
@@ -134,9 +148,35 @@ from the `@preprod` tag. If the tag resolves to something else, every
 
 ## Environment
 
-No environment variables are read today. When they arrive: `.env*` is gitignored
-except `.env.example`; `.npmrc` is gitignored; `.claude/settings.json` denies
-reading both. Never copy their contents into a log, a fixture, or a chat.
+No code reads an environment variable yet. Two templates describe what will be
+read, and both are checked in because neither holds a value:
+
+- `.env.example` — the six `LAKAUT_*` variables, each with the constraint that
+  makes it dangerous to get wrong. Copy to `.env`.
+- `.npmrc.example` — routes the `@lakaut` scope to the private registry and
+  takes the Nexus credential from `LAKAUT_NPM_AUTH`. Copy to `.npmrc`.
+
+`.env*` is gitignored except `.env.example`; `.npmrc` is gitignored;
+`.claude/settings.json` denies reading both. Never copy their contents into a
+log, a fixture, or a chat.
+
+The two credentials load by different mechanisms, and the difference is not
+cosmetic. The runtime variables are read by a Node process, so `.env` reaches
+them — Node 22 loads it natively with `--env-file=.env`, which is why there is
+no `dotenv` dependency and should not be one. `LAKAUT_NPM_AUTH` is read by
+`.npmrc`, which `pnpm` consults before any process of ours exists, and **pnpm
+does not read `.env`**. Putting it there fails silently: the same
+`Failed to replace env in config` warning, then a 401. It belongs in the shell
+environment, or in CI as a repository secret.
+
+Unset, it costs two warnings per install and nothing else — `@lakaut/*` is not a
+dependency of any package yet, so every other install path still resolves. That
+stops being true the day the adapter lands, and CI needs the credential from
+that day. Only that one: STYLES §10 forbids live `@lakaut` calls in unit tests,
+so CI installs with the Nexus credential and never holds the API key.
+
+Both credentials are shown exactly once and Lakaut keeps only a hash. Rotation
+is immediate with no grace period, so a rotation is a deploy, not a chore.
 
 ## Design documents
 
