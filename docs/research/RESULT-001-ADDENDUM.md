@@ -184,3 +184,57 @@ this change; all 28 issues were closed as not planned on 2026-08-19 and the
 document was deleted. `CORE-NN` references elsewhere in this addendum name
 tickets that no longer exist — they are kept because this file is a dated
 record. Open GitHub issues are the live plan.
+
+---
+
+## 9. §3.6's email claim is wrong, and §5's risk 5 with it
+
+RESULT-001 §3.6 concludes *"Onboarding therefore requires an email address"* and
+§5 lists it as risk 5: *"Either the origination form grows a validated email
+field, or first-time borrowers cannot be onboarded."* Both overstate the source.
+
+**What the vendor actually says.** `[sesiones]` §"Campos de la sesión" lists
+`allowedOrigin` as *"el único campo estrictamente obligatorio"*, `email` as
+*"No — salvo con `auth.sms.v1`… Email inicial; Hosted UI lo utiliza sin
+exponerlo en eventos"*, and `phone` as *"Prellenado de conveniencia, igual que
+`email`"*.
+
+The error is a conflation. `requiredInputs: ["EMAIL", "PHONE"]` names what the
+**journey** collects, inside the Hosted UI. It is not what the **integrator**
+must supply. §3.6 says as much two paragraphs earlier — pre-supplying `email`
+*"suppresses the capture step but not the verification"* — which only makes
+sense if there is a capture step to suppress. Onboarding a signer who has never
+given us an address works; Lakaut asks them for one.
+
+**Confirmed against the live integration.** The preproduction scope panel for
+integration `lucerosa` (2026-09-11) shows `Onboarding` and `Onboarding + Firma`
+with one method, `Email + SMS`, and `Firma` with three — `Email + SMS`,
+`Sólo email`, `Sólo SMS`. That is the profile matrix §3.6 describes, and it
+constrains which profile is legal, not which field the integrator sends.
+
+**What survives, in a narrower and more useful form.** Holding the email is not
+required to onboard. It is required for two specific things:
+
+1. `getSigningEligibility` — the call that routes a returning signer to `SIGNING`
+   rather than `ONBOARDING_AND_SIGNING` — takes `email: string` as a
+   non-optional field of `SigningEligibilityInput` [`[api]`
+   §`getSigningEligibility`].
+2. `auth.sms.v1` *"exige `email` y `phone` juntos"* server-bound, and the SDK
+   fails before the call leaves our process when either is missing
+   [`[sesiones]`]. The Sólo SMS convenience is unavailable without both.
+
+And the email does not come back to us on its own: *"Los payloads no contienen
+OTP, DNI, email, PIN, token, evidencia biométrica ni PDF"* [`[eventos]`]. An
+address Lakaut collects inside the iframe is one we never learn.
+
+**Consequence.** Not a blocking origination field, and not a design change to
+the borrower's first screen. It is a choice: hold the email and get cheap
+routing plus SMS-only for repeat signers, or do not and re-derive the journey
+some other way each time. Risk 5's severity drops from *High* to *Low*, and it
+changes category from "missing field" to "routing strategy".
+
+**Open, and cheap to settle now that preproduction access exists.** Whether
+creating `ONBOARDING_AND_SIGNING` for a signer who already holds a valid
+certificate is a no-op or re-runs onboarding. If it is a no-op, the email is
+never needed for routing at all. The documentation does not say; the sandbox
+will.
