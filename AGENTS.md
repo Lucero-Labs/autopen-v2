@@ -123,9 +123,23 @@ affirmatively by rc.40 (`ADDENDUM` §1) and is no longer open.
 **Preproduction is not a scratch environment.** A Lakaut account is one per DNI,
 the signing PIN is per-signature with no documented reset, and
 `SIGN_PIN_RATE_LIMITED` is a real code. A test identity whose PIN locks may not
-be replaceable by the same person. Whether preproduction accepts a synthetic DNI
-or demands a real one with biometrics is undocumented and unrun. Treat onboarding
-a test subject as possibly unrepeatable, and run PIN-bearing experiments last.
+be replaceable by the same person.
+
+Whether a synthetic DNI passes is the unresolved part, and the mirror argues both
+ways. The testing checklist closes with *«Usá usuarios y documentos sintéticos o
+autorizados para pruebas»* (`sdk-integracion__ambientes-versionado.md`). But
+`ONBOARDING` runs identity validation with Veriff and data validation against
+RENAPER as steps 4 and 5, and *«si DNI y sexo fueron proporcionados por el
+backend, el paso de captura se omite, pero la validación de identidad y RENAPER
+se realiza igualmente»* (`sdk-integracion__flujos-identidad.md`). Either
+preproduction stubs both providers, or *«sintéticos»* covers the documents and
+*«autorizados»* covers the people. Ask before assuming; the readings differ by
+whether every test signer has to be a consenting human.
+
+Treat onboarding a test subject as possibly unrepeatable, and run PIN-bearing
+experiments last. `sessions.getSigningEligibility({ externalUserRef, email })` is
+the one probe that costs nothing: no session, no PIN, no certificate, and it
+answers whether an identity already holds one.
 
 Verify the installed SDK version before trusting any vendor claim in this repo:
 `docs/vendor/lakaut/` is pinned at `0.1.0-rc.40`, and the dashboard installs
