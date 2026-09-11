@@ -103,3 +103,32 @@ console.log("allowedCombinations");
 for (const combination of body.allowedCombinations ?? []) {
   console.log(`  ${combination.journeyId} + ${combination.authenticationProfileId}`);
 }
+
+// The npm channel and the service can disagree, so version-check both. A route
+// that does not exist answers 404 before it looks at a body — so an empty body
+// separates "endpoint absent" from "endpoint present, bad input" without
+// sending a single identity field.
+console.log();
+console.log("rc.40 endpoints, by presence (empty body on purpose)");
+
+const rc40 = [
+  ["/v1/sdk/signing-eligibility", "getSigningEligibility (ADDENDUM §3)"],
+  [
+    "/v1/sdk/sessions/00000000-0000-4000-8000-000000000000/documents/probe/signed-artifact-binding",
+    "artifact binding 1.2 (ADDENDUM §4)",
+  ],
+];
+
+for (const [path, what] of rc40) {
+  const probe = await fetch(new URL(path, baseUrl), {
+    method: "POST",
+    headers: {
+      "X-Integrator-Id": integratorId,
+      "X-API-Key": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: "{}",
+  });
+  const verdict = probe.status === 404 ? "ABSENT — service predates rc.40" : "present";
+  console.log(`  ${probe.status}  ${verdict.padEnd(32)} ${what}`);
+}

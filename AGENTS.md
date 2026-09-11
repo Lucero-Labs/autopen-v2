@@ -162,11 +162,18 @@ this mirror, and the version RESULT-001 was originally written against. Pinning
 the exact version is what keeps the `[Documented:]` citations valid, which
 STYLES §1.1 requires regardless.
 
-Worth asking Lakaut, because the two halves of their own preproduction disagree:
-the rc.40 documentation describes itself as the preproduction-validated
-candidate, while the preproduction channel serves rc.34. Until that is answered,
-treat the rc.40 capability claims in `ADDENDUM` §1 as describing a version that
-is installable but not necessarily the one Lakaut runs in preproduction.
+**The service is not stale — only the tag is.** Probed the same day by asking
+two rc.40-only endpoints to reject an empty body:
+`POST /v1/sdk/signing-eligibility` and the artefact-binding route both answer
+`400 INVALID_REQUEST`, not `404`. A route that does not exist answers before it
+inspects a body, so both are present. The rc.40 capability claims in `ADDENDUM`
+§1–§4 therefore describe endpoints preproduction actually serves.
+
+That narrows the discrepancy to packaging: the `@preprod` tag lags the service
+it is meant to install against. Still worth mentioning to Lakaut, but it is not
+a reason to distrust the mirror. A 400 proves a route exists; it does not prove
+every rc.40 behaviour behind it, so a capability that matters should still be
+exercised rather than assumed.
 
 `npm view` against this Nexus exits 0 and prints nothing — a silence that reads
 like a missing package and is not one. The probe queries the registry over HTTP
