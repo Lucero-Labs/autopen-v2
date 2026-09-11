@@ -1,0 +1,18 @@
+# Routes the @lakaut scope to Lakaut's private Nexus registry. Every other
+# dependency keeps resolving from the default registry.
+#
+# Copy this file to .npmrc — which is gitignored — and provide LAKAUT_NPM_AUTH
+# from the environment. The value is the Nexus credential from the integrator
+# dashboard, shown exactly once. Never write it resolved into either file: the
+# vendor treats a credential that reached a repository as compromised and
+# rotation has no grace period.
+#
+# The Nexus credential is read-only and is for development and CI. It is not a
+# runtime credential and cannot call the API.
+#
+# [Documented: docs/vendor/lakaut/sdk-integracion__credenciales.md
+#  §"Acceso Nexus", §"Instalar los paquetes"]
+
+@lakaut:registry=https://packages-preprod.lakautac.com.ar/repository/lakaut-sdk/
+//packages-preprod.lakautac.com.ar/repository/lakaut-sdk/:_auth=${LAKAUT_NPM_AUTH}
+always-auth=true

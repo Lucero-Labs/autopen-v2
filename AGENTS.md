@@ -134,9 +134,26 @@ from the `@preprod` tag. If the tag resolves to something else, every
 
 ## Environment
 
-No environment variables are read today. When they arrive: `.env*` is gitignored
-except `.env.example`; `.npmrc` is gitignored; `.claude/settings.json` denies
-reading both. Never copy their contents into a log, a fixture, or a chat.
+No code reads an environment variable yet. Two templates describe what will be
+read, and both are checked in because neither holds a value:
+
+- `.env.example` — the six `LAKAUT_*` variables, each with the constraint that
+  makes it dangerous to get wrong. Copy to `.env`.
+- `.npmrc.example` — routes the `@lakaut` scope to the private registry and
+  takes the Nexus credential from `LAKAUT_NPM_AUTH`. Copy to `.npmrc`.
+
+`.env*` is gitignored except `.env.example`; `.npmrc` is gitignored;
+`.claude/settings.json` denies reading both. Never copy their contents into a
+log, a fixture, or a chat.
+
+`LAKAUT_NPM_AUTH` is read by `.npmrc`, not by the application, so it has to be
+exported into the environment before `pnpm` runs. Unset, it costs two warnings
+per install and nothing else — `@lakaut/*` is not a dependency of any package
+yet, so every other install path still resolves. That stops being true the day
+the adapter lands, and CI needs the credential from that day.
+
+Both credentials are shown exactly once and Lakaut keeps only a hash. Rotation
+is immediate with no grace period, so a rotation is a deploy, not a chore.
 
 ## Design documents
 
