@@ -160,11 +160,20 @@ read, and both are checked in because neither holds a value:
 `.claude/settings.json` denies reading both. Never copy their contents into a
 log, a fixture, or a chat.
 
-`LAKAUT_NPM_AUTH` is read by `.npmrc`, not by the application, so it has to be
-exported into the environment before `pnpm` runs. Unset, it costs two warnings
-per install and nothing else — `@lakaut/*` is not a dependency of any package
-yet, so every other install path still resolves. That stops being true the day
-the adapter lands, and CI needs the credential from that day.
+The two credentials load by different mechanisms, and the difference is not
+cosmetic. The runtime variables are read by a Node process, so `.env` reaches
+them — Node 22 loads it natively with `--env-file=.env`, which is why there is
+no `dotenv` dependency and should not be one. `LAKAUT_NPM_AUTH` is read by
+`.npmrc`, which `pnpm` consults before any process of ours exists, and **pnpm
+does not read `.env`**. Putting it there fails silently: the same
+`Failed to replace env in config` warning, then a 401. It belongs in the shell
+environment, or in CI as a repository secret.
+
+Unset, it costs two warnings per install and nothing else — `@lakaut/*` is not a
+dependency of any package yet, so every other install path still resolves. That
+stops being true the day the adapter lands, and CI needs the credential from
+that day. Only that one: STYLES §10 forbids live `@lakaut` calls in unit tests,
+so CI installs with the Nexus credential and never holds the API key.
 
 Both credentials are shown exactly once and Lakaut keeps only a hash. Rotation
 is immediate with no grace period, so a rotation is a deploy, not a chore.
