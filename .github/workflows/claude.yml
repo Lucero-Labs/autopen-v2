@@ -1,0 +1,48 @@
+# Claude on request, never on a schedule. Runs bill against a Claude
+# subscription rather than API credit, so the cost is usage that competes with
+# the author's own sessions — worth spending on a diff someone chose, not on
+# every PR automatically. Say `@claude review this` on a pull request, or ask it
+# a question in any issue comment.
+#
+# It reads CLAUDE.md, and therefore AGENTS.md and STYLES.md, on every run. The
+# conventions it reviews against are the ones in those files; there is no prompt
+# here duplicating them.
+name: Claude
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    name: claude
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run Claude
+        uses: anthropics/claude-code-action@0d0e0876d3eaa933f45dc692f7a4312c83caf36f # v1.0.218
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
+          plugins: "code-review@claude-code-plugins"
+          claude_args: "--model claude-fable-5-1 --effort max --dangerously-skip-permissions"
