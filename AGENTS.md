@@ -141,10 +141,36 @@ experiments last. `sessions.getSigningEligibility({ externalUserRef, email })` i
 the one probe that costs nothing: no session, no PIN, no certificate, and it
 answers whether an identity already holds one.
 
-Verify the installed SDK version before trusting any vendor claim in this repo:
-`docs/vendor/lakaut/` is pinned at `0.1.0-rc.40`, and the dashboard installs
-from the `@preprod` tag. If the tag resolves to something else, every
-`[Documented:]` citation here is provisional until drift is re-checked.
+### Channel drift, measured 2026-09-11
+
+Both credentials are verified working. `scripts/probe-catalog.mjs` returns the
+catalogue over the API key; `scripts/probe-registry.mjs` reads the registry with
+the Nexus credential. Run them rather than assuming — neither creates a session,
+allocates a document, or touches an identity.
+
+What the registry actually serves, identically for all three packages:
+
+| Channel | Resolves to |
+| --- | --- |
+| `@preprod` | `0.1.0-rc.34` |
+| `@dev` | `0.1.0-rc.53` |
+
+`0.1.0-rc.40` is published and installs cleanly by exact version — verified, not
+assumed. But **no channel points at it**, so the dashboard's
+`pnpm add @lakaut/server@preprod` shortcut installs rc.34: six versions behind
+this mirror, and the version RESULT-001 was originally written against. Pinning
+the exact version is what keeps the `[Documented:]` citations valid, which
+STYLES §1.1 requires regardless.
+
+Worth asking Lakaut, because the two halves of their own preproduction disagree:
+the rc.40 documentation describes itself as the preproduction-validated
+candidate, while the preproduction channel serves rc.34. Until that is answered,
+treat the rc.40 capability claims in `ADDENDUM` §1 as describing a version that
+is installable but not necessarily the one Lakaut runs in preproduction.
+
+`npm view` against this Nexus exits 0 and prints nothing — a silence that reads
+like a missing package and is not one. The probe queries the registry over HTTP
+for that reason.
 
 ## Environment
 
