@@ -145,7 +145,16 @@ form.addEventListener("submit", (submission) => {
         fileName: opened.fileName,
         language: "es",
         onEvent: (event) => {
-          say(`evento ${event.type}`, event.type === "lakaut.flow.failed");
+          const detail = [
+            event.step !== undefined ? `step=${event.step}` : "",
+            event.errorCode !== undefined ? `errorCode=${event.errorCode}` : "",
+            event.retryable !== undefined ? `retryable=${String(event.retryable)}` : "",
+            event.safeMessage ?? "",
+          ]
+            .filter((part) => part !== "")
+            .join("  ");
+
+          say(`${event.type}  ${detail}`.trimEnd(), event.type === "lakaut.flow.failed");
           // The visual experience ending is a cue to go and read the record,
           // never a conclusion in itself.
           if (event.type === "lakaut.flow.completed" || event.type === "lakaut.flow.failed") {

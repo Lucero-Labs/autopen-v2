@@ -28,12 +28,47 @@ import type {
   SignedDelivery,
 } from "@autopen/core";
 import { HostedUiRenderer } from "@lakaut/browser";
-import type { SessionForRenderer, SignedDocumentArtifact } from "@lakaut/browser";
+import type {
+  BrowserLifecycleEvent,
+  SessionForRenderer,
+  SignedDocumentArtifact,
+} from "@lakaut/browser";
 
 /** What a mounted ceremony offers its host: the ability to take it down. */
 export interface MountedCeremony {
   /** Removes the iframe, its listeners, its timeouts and its in-memory material. */
   destroy(): void;
+}
+
+/**
+ * A lifecycle notification, flattened to the fields a host can act on.
+ *
+ * `errorCode` and `retryable` are the whole point. A failure without its code
+ * is unactionable — the difference between "the PIN was wrong, try again in
+ * this step" and "the attempts are spent, this identity is done" is one string,
+ * and losing it turns a recoverable step into a session nobody dares touch
+ * (STYLES §9.3). `safeMessage` is the vendor's own redacted text and carries no
+ * PIN, OTP or identity data.
+ */
+export interface CeremonyEvent {
+  readonly type: string;
+  readonly step?: string;
+  readonly errorCode?: string;
+  readonly safeMessage?: string;
+  readonly retryable?: boolean;
+}
+
+/** Flattens the vendor's discriminated union without losing its failure detail. */
+function toCeremonyEvent(event: BrowserLifecycleEvent): CeremonyEvent {
+  return Object.freeze({
+    type: event.type,
+    ...("step" in event ? { step: event.step } : {}),
+    ...("errorCode" in event ? { errorCode: event.errorCode } : {}),
+    ...("safeMessage" in event && event.safeMessage !== undefined
+      ? { safeMessage: event.safeMessage }
+      : {}),
+    ...("retryable" in event ? { retryable: event.retryable } : {}),
+  });
 }
 
 export interface MountCeremonyOptions {
@@ -57,7 +92,7 @@ export interface MountCeremonyOptions {
    * "signed" is the conflation STYLES §9.1 exists to prevent — read the
    * backend's authoritative status instead.
    */
-  readonly onEvent?: (event: { readonly type: string }) => void;
+  readonly onEvent?: (event: CeremonyEvent) => void;
   /** Receives the delivered copy. Whatever it resolves to, nothing is proven yet. */
   readonly onSigned: (delivery: SignedDelivery) => Promise<void>;
 }
@@ -90,6 +125,8 @@ function toSignedDelivery(artifact: SignedDocumentArtifact): SignedDelivery {
 
 /** Mounts the Hosted UI into `container` and starts the ceremony. */
 export function mountCeremony(options: MountCeremonyOptions): MountedCeremony {
+  const { onEvent } = options;
+
   const renderer = new HostedUiRenderer({
     session: options.handoff.context as unknown as SessionForRenderer,
     container: options.container,
@@ -100,7 +137,7 @@ export function mountCeremony(options: MountCeremonyOptions): MountedCeremony {
       mimeType: "application/pdf",
       bytes: toArrayBuffer(options.document.bytes),
     },
-    ...(options.onEvent !== undefined ? { on: options.onEvent } : {}),
+    ...(onEvent !== undefined ? { on: (event) => onEvent(toCeremonyEvent(event)) } : {}),
     onDocumentSigned: async (artifact) => {
       await options.onSigned(toSignedDelivery(artifact));
     },
