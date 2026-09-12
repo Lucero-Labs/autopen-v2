@@ -4,3 +4,9 @@ export {
   type LakautProviderOptions,
   type LakautSessions,
 } from "./provider.js";
+
+export {
+  createLakautProvider,
+  type LakautClientOptions,
+  type LakautEnvironment,
+} from "./client.js";

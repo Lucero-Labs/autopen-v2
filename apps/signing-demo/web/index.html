@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>autopen · ceremonia de firma</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 60rem;
+        padding: 2rem 1rem 4rem;
+        background: #fbfbfa;
+        color: #1a1a19;
+      }
+      h1 {
+        font-size: 1.25rem;
+        margin: 0 0 0.25rem;
+      }
+      p.lede {
+        margin: 0 0 1.5rem;
+        color: #6b6b66;
+      }
+      form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+        gap: 0.75rem 1rem;
+        padding: 1rem;
+        border: 1px solid #e3e3df;
+        border-radius: 8px;
+        background: #fff;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        font-size: 0.8125rem;
+        color: #4a4a46;
+      }
+      input,
+      select {
+        font: inherit;
+        padding: 0.4rem 0.5rem;
+        border: 1px solid #d6d6d1;
+        border-radius: 5px;
+        background: #fff;
+      }
+      button {
+        font: inherit;
+        align-self: end;
+        padding: 0.45rem 1rem;
+        border: 0;
+        border-radius: 5px;
+        background: #1a1a19;
+        color: #fff;
+        cursor: pointer;
+      }
+      #lakaut-hosted-ui {
+        width: 100%;
+        min-width: 0;
+        min-height: 810px;
+        margin-top: 1.5rem;
+        overflow: hidden;
+      }
+      #log {
+        margin-top: 1.5rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.75rem;
+        line-height: 1.7;
+        color: #4a4a46;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Ceremonia de firma</h1>
+    <p class="lede">
+      Preproducción. <code>signing</code> supone un certificado ya emitido;
+      <code>onboarding-and-signing</code> lo emite en el momento y exige email y teléfono.
+    </p>
+
+    <form id="plan">
+      <label>
+        Journey
+        <select name="journey">
+          <option value="signing">signing</option>
+          <option value="onboarding-and-signing">onboarding-and-signing</option>
+        </select>
+      </label>
+      <label>
+        Factores
+        <select name="factors">
+          <option value="email">email</option>
+          <option value="email-and-sms">email-and-sms</option>
+          <option value="sms">sms</option>
+        </select>
+      </label>
+      <label>
+        Email
+        <input name="email" type="email" required placeholder="firmante@ejemplo.com" />
+      </label>
+      <label>
+        Teléfono
+        <input name="phone" type="tel" placeholder="+54 9 11 …" />
+      </label>
+      <label>
+        Referencia
+        <input name="reference" required value="ar.pagare/demo-0001" />
+      </label>
+      <label>
+        Monto (pesos)
+        <input name="pesos" type="number" min="1" step="1" required value="1900000" />
+      </label>
+      <button type="submit">Abrir ceremonia</button>
+    </form>
+
+    <div id="lakaut-hosted-ui"></div>
+    <div id="log"></div>
+
+    <script type="module" src="/client.js"></script>
+  </body>
+</html>

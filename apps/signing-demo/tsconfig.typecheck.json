@@ -1,6 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "noEmit": true },
-  "include": ["src/**/*", "test/**/*"],
-  "exclude": ["src/renderer.ts"]
+  "include": ["src/**/*"]
 }

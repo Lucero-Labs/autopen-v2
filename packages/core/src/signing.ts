@@ -50,10 +50,17 @@ export interface SignerIdentity {
  * verify the signer against a specific person rather than whoever holds the
  * link — but whether to require it is a product decision, so the port supports
  * both and forces neither.
+ *
+ * `email` and `phone` are pre-fills for the ceremony's own forms, not stored
+ * facts: Lakaut documents `phone` as *"client-side pre-fill convenience only,
+ * same as email — not persisted or validated by the backend today"*
+ * (`sessions.d.ts` at rc.40). Supplying one saves the signer some typing and
+ * establishes nothing.
  */
 export interface SignerRole {
   readonly role: string;
   readonly email?: string | undefined;
+  readonly phone?: string | undefined;
   readonly identity?: SignerIdentity | undefined;
   readonly externalUserRef?: string | undefined;
 }

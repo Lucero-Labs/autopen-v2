@@ -164,6 +164,7 @@ export class LakautSignatureProvider implements SignatureProvider {
       allowedOrigin: this.#allowedOrigin,
       capabilities: ["signed-document-reconciliation:1.2"],
       ...(signer.email !== undefined ? { email: signer.email } : {}),
+      ...(signer.phone !== undefined ? { phone: signer.phone } : {}),
       ...(signer.externalUserRef !== undefined ? { externalUserRef: signer.externalUserRef } : {}),
       ...(signer.identity !== undefined
         ? {
