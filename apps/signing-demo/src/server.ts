@@ -58,7 +58,26 @@ function required(name: string): string {
   return value;
 }
 
-const ORIGIN = required("LAKAUT_ALLOWED_ORIGIN");
+/**
+ * Refuses to start against an origin the Hosted UI cannot be framed by.
+ *
+ * `createSession` accepts whatever origin it is handed and validates it against
+ * the dashboard, so a wrong value here does not fail until the iframe declines
+ * to load — and the browser reports that as a bare "refused to connect". An
+ * http origin never works: the ceremony needs camera access, which browsers
+ * grant only over https (`sdk-integracion__frontend-hosted-ui.md`).
+ */
+function toOrigin(value: string): string {
+  if (!value.startsWith("https://")) {
+    throw new Error(
+      `LAKAUT_ALLOWED_ORIGIN is "${value}". The Hosted UI needs an https origin ` +
+        "declared in the dashboard — point it at your tunnel, not at localhost.",
+    );
+  }
+  return value;
+}
+
+const ORIGIN = toOrigin(required("LAKAUT_ALLOWED_ORIGIN"));
 
 /** Narrows the configured environment rather than trusting the string (§0.1). */
 function toEnvironment(value: string): LakautEnvironment {

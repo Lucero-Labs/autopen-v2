@@ -31,10 +31,36 @@ const log = document.querySelector("#log") as HTMLElement;
 
 let mounted: MountedCeremony | undefined;
 
-function say(line: string): void {
+function say(line: string, fault = false): void {
   const entry = document.createElement("div");
   entry.textContent = `${new Date().toLocaleTimeString("es-AR")}  ${line}`;
+  if (fault) entry.className = "fault";
   log.prepend(entry);
+}
+
+/**
+ * Refuses to mount into an origin the session was not issued for.
+ *
+ * The Hosted UI declines to be framed by anything other than the session's
+ * `allowedOrigin`, and the browser reports that as a bare "refused to connect"
+ * inside an empty iframe — a message that names neither origin and points at
+ * Lakaut rather than at the mismatch. The session is created successfully
+ * beforehand, because the API validates the origin it is *given*, not the one
+ * the page turns out to be served from.
+ *
+ * So check it here, where both values are known, and say which is which.
+ */
+function assertOriginMatches(handoff: CeremonyHandoff): void {
+  const issuedFor = handoff.context.allowedOrigin;
+  if (typeof issuedFor !== "string") return;
+
+  if (issuedFor !== window.location.origin) {
+    throw new Error(
+      `la sesión se abrió para ${issuedFor} pero la página está en ` +
+        `${window.location.origin}. Poné LAKAUT_ALLOWED_ORIGIN en ese valor, ` +
+        "declaralo en el dashboard, y reiniciá el servidor.",
+    );
+  }
 }
 
 function bytesFromBase64(base64: string): Uint8Array {
@@ -103,6 +129,7 @@ form.addEventListener("submit", (submission) => {
       })) as OpenResponse;
 
       say(`sesión ${opened.ceremonyId}  documento ${opened.document.documentId}`);
+      assertOriginMatches(opened.handoff);
 
       const sealed: SealedDocument = {
         documentId: opened.document.documentId as DocumentId,
@@ -118,7 +145,7 @@ form.addEventListener("submit", (submission) => {
         fileName: opened.fileName,
         language: "es",
         onEvent: (event) => {
-          say(`evento ${event.type}`);
+          say(`evento ${event.type}`, event.type === "lakaut.flow.failed");
           // The visual experience ending is a cue to go and read the record,
           // never a conclusion in itself.
           if (event.type === "lakaut.flow.completed" || event.type === "lakaut.flow.failed") {
@@ -140,7 +167,7 @@ form.addEventListener("submit", (submission) => {
         },
       });
     } catch (error) {
-      say(`error: ${error instanceof Error ? error.message : "desconocido"}`);
+      say(`error: ${error instanceof Error ? error.message : "desconocido"}`, true);
     }
   })();
 });
