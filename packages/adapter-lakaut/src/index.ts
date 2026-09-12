@@ -6,9 +6,11 @@ export {
 } from "./provider.js";
 
 export {
+  checkSigningEligibility,
   createLakautProvider,
   type LakautClientOptions,
   type LakautEnvironment,
+  type SigningEligibility,
 } from "./client.js";
 
 export {

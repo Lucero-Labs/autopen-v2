@@ -28,6 +28,7 @@ interface OpenResponse {
 const form = document.querySelector("#plan") as HTMLFormElement;
 const container = document.querySelector("#lakaut-hosted-ui") as HTMLElement;
 const log = document.querySelector("#log") as HTMLElement;
+const check = document.querySelector("#check") as HTMLButtonElement;
 
 let mounted: MountedCeremony | undefined;
 
@@ -108,6 +109,54 @@ async function reconcile(ceremonyId: string): Promise<void> {
       : `estado autoritativo: ${status.state}  correlationId=${status.correlationId}`,
   );
 }
+
+/**
+ * Asks the provider which journey this signer needs, and selects it.
+ *
+ * Free — no session, no document, no PIN. It answers whether a certificate
+ * exists and nothing more: a signer with no signature balance still reads as
+ * READY_FOR_SIGNING, so a green answer here does not promise the ceremony can
+ * finish (docs/research/ADDENDUM-quota.md).
+ */
+check.addEventListener("click", () => {
+  const fields = new FormData(form);
+
+  void (async () => {
+    try {
+      const verdict = (await post("/api/eligibility", {
+        email: fields.get("email"),
+        reference: fields.get("reference"),
+      })) as {
+        readonly decision: string;
+        readonly journey?: string;
+        readonly nextAction: string;
+        readonly correlationId: string;
+      };
+
+      say(`elegibilidad: ${verdict.decision}  nextAction=${verdict.nextAction}`);
+
+      if (verdict.journey !== undefined) {
+        const select = form.elements.namedItem("journey") as HTMLSelectElement;
+        select.value = verdict.journey;
+        say(`journey seleccionado: ${verdict.journey}`);
+
+        // The only pairing the catalogue allows for onboarding is email+sms,
+        // whose required inputs are EMAIL and PHONE.
+        if (verdict.journey === "onboarding-and-signing") {
+          (form.elements.namedItem("factors") as HTMLSelectElement).value = "email-and-sms";
+          say("factors ajustado a email-and-sms — onboarding exige email y teléfono");
+        }
+      }
+
+      say(
+        "ojo: la elegibilidad no contempla el saldo de firma",
+        verdict.decision === "READY_FOR_SIGNING",
+      );
+    } catch (error) {
+      say(`error: ${error instanceof Error ? error.message : "desconocido"}`, true);
+    }
+  })();
+});
 
 form.addEventListener("submit", (submission) => {
   submission.preventDefault();

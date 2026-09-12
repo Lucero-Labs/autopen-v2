@@ -12,7 +12,7 @@
  * only place that knows where its secrets live (STYLES §8.2).
  */
 
-import type { Clock } from "@autopen/core";
+import type { CeremonyJourney, Clock } from "@autopen/core";
 import { HttpAuthTransport, SessionClient } from "@lakaut/server";
 import type { CompatibilityMetadata } from "@lakaut/shared-contracts";
 
@@ -26,6 +26,77 @@ import { LakautSignatureProvider } from "./provider.js";
  * keeps `@lakaut/*` out of every package but this one (STYLES §2).
  */
 export type LakautEnvironment = "local" | "sandbox" | "production";
+
+/**
+ * What the provider knows about a would-be signer, before any session exists.
+ *
+ * `journey` is directly usable as a `CeremonyPlan.journey`, which is the point:
+ * the provider computes per identity what we would otherwise be guessing.
+ *
+ * `decision` is deliberately kept alongside it. The two are not the same
+ * question — `CERTIFICATE_PREPARING` and `RETRY_LATER` both recommend no
+ * journey at all, and a caller that reads only `journey` cannot tell "wait" from
+ * "no answer". **And neither field accounts for signature quota**: a signer with
+ * a valid certificate and no remaining balance reads as `READY_FOR_SIGNING`,
+ * verified against preproduction on 2026-09-12
+ * (`docs/research/ADDENDUM-quota.md` §2). This answers whether a certificate
+ * exists, never whether a signature can happen.
+ */
+export interface SigningEligibility {
+  readonly decision:
+    | "READY_FOR_SIGNING"
+    | "ONBOARDING_REQUIRED"
+    | "CERTIFICATE_PREPARING"
+    | "RETRY_LATER";
+  readonly journey?: CeremonyJourney;
+  readonly nextAction: "CREATE_SESSION" | "RETRY" | "CONTACT_LAKAUT";
+  readonly retryAfterSeconds?: number;
+  readonly checkedAt: string;
+  /** Often only seconds after `checkedAt`. Re-read rather than cache. */
+  readonly validUntil: string;
+  readonly correlationId: string;
+}
+
+/**
+ * Asks whether an identity already holds a signing certificate.
+ *
+ * The one read that costs nothing: no session is created, no document is
+ * allocated, no PIN or certificate is touched (AGENTS.md). Safe to call before
+ * every ceremony, and cheap enough that caching it is not worth the staleness.
+ */
+export async function checkSigningEligibility(
+  options: LakautClientOptions,
+  subject: { readonly email: string; readonly externalUserRef: string },
+): Promise<SigningEligibility> {
+  const decision = await sessionsFor(options).getSigningEligibility({
+    email: subject.email,
+    externalUserRef: subject.externalUserRef,
+  });
+
+  return Object.freeze({
+    decision: decision.decision,
+    ...(decision.recommendedJourneyId !== null
+      ? { journey: toCeremonyJourney(decision.recommendedJourneyId) }
+      : {}),
+    nextAction: decision.nextAction,
+    ...(decision.retryAfterSeconds !== null
+      ? { retryAfterSeconds: decision.retryAfterSeconds }
+      : {}),
+    checkedAt: decision.checkedAt,
+    validUntil: decision.validUntil,
+    correlationId: decision.correlationId,
+  });
+}
+
+/** The recommendation, in the port's vocabulary. */
+function toCeremonyJourney(recommended: "SIGNING" | "ONBOARDING_AND_SIGNING"): CeremonyJourney {
+  switch (recommended) {
+    case "SIGNING":
+      return "signing";
+    case "ONBOARDING_AND_SIGNING":
+      return "onboarding-and-signing";
+  }
+}
 
 /**
  * The versions this adapter negotiates with, verbatim from the rc.40 docs.
@@ -61,18 +132,23 @@ export interface LakautClientOptions {
   readonly now: Clock;
 }
 
+/** The configured session client. Shared by the provider and the free reads. */
+function sessionsFor(options: LakautClientOptions): SessionClient {
+  return new SessionClient(
+    new HttpAuthTransport({
+      baseUrl: options.baseUrl,
+      integratorId: options.integratorId,
+      apiKey: options.apiKey,
+      environment: options.environment,
+      compatibility: COMPATIBILITY,
+    }),
+  );
+}
+
 /** Assembles the transport, the session client and the provider around them. */
 export function createLakautProvider(options: LakautClientOptions): LakautSignatureProvider {
-  const transport = new HttpAuthTransport({
-    baseUrl: options.baseUrl,
-    integratorId: options.integratorId,
-    apiKey: options.apiKey,
-    environment: options.environment,
-    compatibility: COMPATIBILITY,
-  });
-
   return new LakautSignatureProvider({
-    sessions: new SessionClient(transport),
+    sessions: sessionsFor(options),
     allowedOrigin: options.allowedOrigin,
     now: options.now,
   });

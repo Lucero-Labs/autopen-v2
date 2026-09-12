@@ -34,6 +34,7 @@ import {
 import {
   answerWebhookChallenge,
   type CeremonyNotification,
+  checkSigningEligibility,
   createLakautProvider,
   isWebhookChallenge,
   LAKAUT_MAX_DOCUMENT_BYTES,
@@ -103,15 +104,17 @@ const WEBHOOK_SECRET = process.env["LAKAUT_WEBHOOK_SECRET"] ?? "";
 
 const ceremonies = new InMemoryCeremonyLedger();
 
+const LAKAUT = {
+  baseUrl: required("LAKAUT_AUTH_BASE_URL"),
+  integratorId: required("LAKAUT_INTEGRATOR_ID"),
+  apiKey: required("LAKAUT_API_KEY"),
+  environment: toEnvironment(required("LAKAUT_ENVIRONMENT")),
+  allowedOrigin: ORIGIN,
+  now: () => new Date(),
+} as const;
+
 const core = new DefaultSigningCore({
-  provider: createLakautProvider({
-    baseUrl: required("LAKAUT_AUTH_BASE_URL"),
-    integratorId: required("LAKAUT_INTEGRATOR_ID"),
-    apiKey: required("LAKAUT_API_KEY"),
-    environment: toEnvironment(required("LAKAUT_ENVIRONMENT")),
-    allowedOrigin: ORIGIN,
-    now: () => new Date(),
-  }),
+  provider: createLakautProvider(LAKAUT),
   documents: new InMemoryDocumentStore(),
   ceremonies,
   now: () => new Date(),
@@ -420,6 +423,20 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
 
   if (request.method === "POST" && url.pathname === "/api/webhooks/lakaut") {
     await handleWebhook(request, response, await readRaw(request));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/eligibility") {
+    const body = await readBody(request);
+    if (!isObject(body)) throw new Error("body must be an object");
+    json(
+      response,
+      200,
+      await checkSigningEligibility(LAKAUT, {
+        email: readString(body, "email"),
+        externalUserRef: readString(body, "reference"),
+      }),
+    );
     return;
   }
 
