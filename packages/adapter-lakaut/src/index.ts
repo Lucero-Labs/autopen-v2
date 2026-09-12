@@ -10,3 +10,12 @@ export {
   type LakautClientOptions,
   type LakautEnvironment,
 } from "./client.js";
+
+export {
+  answerWebhookChallenge,
+  isWebhookChallenge,
+  readCeremonyNotification,
+  type CeremonyNotification,
+  type WebhookChallengeReply,
+  type WebhookHeaders,
+} from "./webhooks.js";

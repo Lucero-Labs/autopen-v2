@@ -8,9 +8,9 @@
  * restarting it forgets everything.
  *
  * What it is not: a product. There is no policy gate in front of the seal, no
- * durable store behind it, no webhook ingress, and no authentication of the
- * caller. Anything here that looks like a decision was made for the demo, not
- * for the core — the core's decisions are in `docs/design/signing-spine.md`.
+ * durable store behind it, and no authentication of the caller. Anything here
+ * that looks like a decision was made for the demo, not for the core — the
+ * core's decisions are in `docs/design/signing-spine.md`.
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
@@ -32,9 +32,14 @@ import {
   type VerifiedArtifact,
 } from "@autopen/core";
 import {
+  answerWebhookChallenge,
+  type CeremonyNotification,
   createLakautProvider,
+  isWebhookChallenge,
   LAKAUT_MAX_DOCUMENT_BYTES,
   type LakautEnvironment,
+  readCeremonyNotification,
+  type WebhookChallengeReply,
 } from "@autopen/adapter-lakaut";
 
 import { renderPagare } from "./pagare.js";
@@ -87,6 +92,17 @@ function toEnvironment(value: string): LakautEnvironment {
   return value;
 }
 
+/**
+ * Blank until a destination is saved in the dashboard, which is correct.
+ *
+ * Read once rather than per request: rotation is a deploy, not a reload, and a
+ * value that can change under a running verifier is how a rotation silently
+ * half-applies.
+ */
+const WEBHOOK_SECRET = process.env["LAKAUT_WEBHOOK_SECRET"] ?? "";
+
+const ceremonies = new InMemoryCeremonyLedger();
+
 const core = new DefaultSigningCore({
   provider: createLakautProvider({
     baseUrl: required("LAKAUT_AUTH_BASE_URL"),
@@ -97,7 +113,7 @@ const core = new DefaultSigningCore({
     now: () => new Date(),
   }),
   documents: new InMemoryDocumentStore(),
-  ceremonies: new InMemoryCeremonyLedger(),
+  ceremonies,
   now: () => new Date(),
   maxDocumentBytes: LAKAUT_MAX_DOCUMENT_BYTES,
 });
@@ -120,6 +136,11 @@ interface DeliveryRequest {
   readonly signedContentHash: string;
   readonly finalPdfHash: string;
   readonly signedAt: string;
+}
+
+/** An error's message, or a stand-in. Never the value itself, which may carry bytes. */
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : "unknown failure";
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -291,6 +312,83 @@ async function serveStatic(path: string, response: ServerResponse): Promise<void
     .end(body);
 }
 
+/**
+ * Answers the challenge, then verified events, on one URL.
+ *
+ * Takes the raw bytes and never re-serialises them: the HMAC covers exactly
+ * what arrived, so a parse-and-rebuild produces a different body and a failed
+ * verification that looks like a wrong secret.
+ *
+ * Events are the only channel that closes an operation without a browser, and
+ * the one that carries a failure's own reason — `auth.session.failed` arrives
+ * with detail the session read does not expose. Handling is idempotent on
+ * `idempotencyKey` because webhooks repeat (STYLES §9.1).
+ */
+async function handleWebhook(
+  request: IncomingMessage,
+  response: ServerResponse,
+  raw: Buffer,
+): Promise<void> {
+  if (WEBHOOK_SECRET === "") {
+    // Fail closed: an unverifiable delivery is never acknowledged (§0.1).
+    console.error("webhook rejected: LAKAUT_WEBHOOK_SECRET is unset");
+    response.writeHead(503).end("webhook secret not configured");
+    return;
+  }
+
+  if (isWebhookChallenge(raw)) {
+    // 401, not 500: a delivery that fails to verify is rejected, not mishandled,
+    // and the distinction is what tells us whose bug it is.
+    let reply: WebhookChallengeReply;
+    try {
+      reply = answerWebhookChallenge(raw, request.headers, WEBHOOK_SECRET);
+    } catch (error) {
+      console.error(`webhook challenge refused: ${describe(error)}`);
+      response.writeHead(401).end("challenge did not verify");
+      return;
+    }
+    console.log(`webhook challenge verified challengeId=${reply.challengeId}`);
+    json(response, 200, reply);
+    return;
+  }
+
+  let event: CeremonyNotification;
+  try {
+    event = readCeremonyNotification(raw, request.headers, WEBHOOK_SECRET);
+  } catch (error) {
+    console.error(`webhook event refused: ${describe(error)}`);
+    response.writeHead(401).end("event did not verify");
+    return;
+  }
+
+  if (await ceremonies.hasApplied(event.idempotencyKey)) {
+    console.log(`webhook repeat ignored type=${event.type} key=${event.idempotencyKey}`);
+    json(response, 200, { status: "already applied" });
+    return;
+  }
+  await ceremonies.markApplied(event.idempotencyKey);
+
+  // `data` is where a failure states its own reason, and it is the reason this
+  // endpoint exists: the session read reports errorCode null for a step that
+  // failed. Safe to log — no PIN, OTP, DNI or bytes travel in an envelope.
+  console.log(
+    `webhook ${event.type} v${event.version} sessionId=${event.ceremonyId} ` +
+      `finalStatus=${event.finalStatus ?? "-"} correlationId=${event.correlationId} ` +
+      `data=${JSON.stringify(event.data)}`,
+  );
+
+  json(response, 200, { status: "applied" });
+}
+
+function readRaw(request: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Uint8Array[] = [];
+    request.on("data", (chunk: Uint8Array) => chunks.push(chunk));
+    request.on("error", reject);
+    request.on("end", () => resolve(Buffer.concat(chunks)));
+  });
+}
+
 function readBody(request: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Uint8Array[] = [];
@@ -320,6 +418,11 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     return;
   }
 
+  if (request.method === "POST" && url.pathname === "/api/webhooks/lakaut") {
+    await handleWebhook(request, response, await readRaw(request));
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/ceremonies") {
     json(response, 201, await openCeremony(await readBody(request)));
     return;
@@ -341,7 +444,7 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
 
 createServer((request, response) => {
   route(request, response).catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : "unknown failure";
+    const message = describe(error);
     // The message may name an error code, which is safe and traceable (§8.1).
     console.error(`${request.method} ${request.url} -> ${message}`);
     if (!response.headersSent) json(response, 500, { error: message });

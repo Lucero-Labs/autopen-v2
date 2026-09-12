@@ -67,6 +67,29 @@ ended, not that anything is signed (STYLES §9.1).
 - **Persistence.** In memory. Restarting forgets every ceremony, so a delivery
   arriving after a restart is refused as an unknown ceremony.
 
+## Webhooks
+
+`POST /api/webhooks/lakaut` answers the verification challenge and then verified
+events, on the one URL Lakaut allows. It needs no signature quota, which makes
+it the part of the flow that can be exercised when signing cannot be — and
+`auth.session.failed` carries detail the session read does not: `getSession`
+reports `errorCode: null` for a step that failed, and the document status
+endpoint answers `404 FORBIDDEN` whether or not the document exists.
+
+Set it up from **Conexión con Lakaut** in the dashboard, which is self-service:
+
+1. Save `https://<tunnel>/api/webhooks/lakaut` as the webhook URL.
+2. **Generar secreto** and copy it — shown once, never recoverable.
+3. Put it in `.env` as `LAKAUT_WEBHOOK_SECRET` and restart the server.
+4. **Verificar destino**, and wait for **Verificado**.
+
+The endpoint fails closed: with no secret configured it answers `503` and
+acknowledges nothing, and a delivery that does not verify gets `401` rather than
+a `500`, so a rejected delivery is distinguishable from a broken handler.
+
+Verify the responder before pointing Lakaut at it — a failed challenge means
+generating a new secret, since the pending one cannot be recovered.
+
 ## Preproduction is not a scratch environment
 
 A Lakaut account is one per DNI, the signing PIN is per signature with no
