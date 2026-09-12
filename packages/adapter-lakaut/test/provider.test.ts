@@ -1,6 +1,7 @@
 import type {
   CeremonyDisposition,
   CeremonyId,
+  CeremonyPlan,
   Clock,
   ContentHash,
   DocumentId,
@@ -20,6 +21,8 @@ import { type LakautSessions, LakautSignatureProvider } from "../src/provider.js
 
 const AT = new Date("2026-09-11T12:00:00.000Z");
 const now: Clock = () => AT;
+
+const PLAN: CeremonyPlan = Object.freeze({ journey: "signing", factors: "email" });
 
 const SESSION_ID = "8f3c1e7a-0000-4000-8000-00000000abcd";
 const CLIENT_TOKEN = "8f3c1e7a.gT7pQ2mX9vK1nR4sL6wY8zB3";
@@ -162,8 +165,6 @@ function build(options: { status?: AuthoritativeSessionStatus } = {}) {
   const provider = new LakautSignatureProvider({
     sessions,
     allowedOrigin: "https://dev.lucerolabs.xyz",
-    flowType: "SIGNING",
-    authenticationProfileId: "auth.email.v1",
     now,
   });
 
@@ -174,7 +175,7 @@ describe("openCeremony", () => {
   it("opts every session into the 1.2 reconciliation contract", async () => {
     const { provider, recorder } = build();
 
-    await provider.openCeremony(SEALED, { role: "librador" });
+    await provider.openCeremony(SEALED, { role: "librador" }, PLAN);
 
     expect(recorder.created[0]?.capabilities).toEqual(["signed-document-reconciliation:1.2"]);
   });
@@ -182,15 +183,47 @@ describe("openCeremony", () => {
   it("sends the authentication profile explicitly rather than letting it default", async () => {
     const { provider, recorder } = build();
 
-    await provider.openCeremony(SEALED, { role: "librador" });
+    await provider.openCeremony(SEALED, { role: "librador" }, PLAN);
 
     expect(recorder.created[0]?.authenticationProfileId).toBe("auth.email.v1");
+  });
+
+  it("takes the journey from the ceremony, so one provider serves a returning and a new signer", async () => {
+    const { provider, recorder } = build();
+
+    await provider.openCeremony(SEALED, { role: "librador" }, PLAN);
+    await provider.openCeremony(
+      SEALED,
+      { role: "librador" },
+      { journey: "onboarding-and-signing", factors: "email-and-sms" },
+    );
+
+    expect(recorder.created.map((input) => input.flowType)).toEqual([
+      "SIGNING",
+      "ONBOARDING_AND_SIGNING",
+    ]);
+    expect(recorder.created.map((input) => input.authenticationProfileId)).toEqual([
+      "auth.email.v1",
+      "auth.email-sms.v1",
+    ]);
+  });
+
+  it("states the sms-only profile the catalogue lists, not a near miss", async () => {
+    const { provider, recorder } = build();
+
+    await provider.openCeremony(
+      SEALED,
+      { role: "librador" },
+      { journey: "signing", factors: "sms" },
+    );
+
+    expect(recorder.created[0]?.authenticationProfileId).toBe("auth.sms.v1");
   });
 
   it("omits identitySubject entirely when no identity was supplied", async () => {
     const { provider, recorder } = build();
 
-    await provider.openCeremony(SEALED, { role: "librador" });
+    await provider.openCeremony(SEALED, { role: "librador" }, PLAN);
 
     expect(recorder.created[0]).not.toHaveProperty("identitySubject");
   });
@@ -198,10 +231,14 @@ describe("openCeremony", () => {
   it("maps our nationalId onto the provider's dni when an identity is bound", async () => {
     const { provider, recorder } = build();
 
-    await provider.openCeremony(SEALED, {
-      role: "librador",
-      identity: { nationalId: "30123456", sexo: "F" },
-    });
+    await provider.openCeremony(
+      SEALED,
+      {
+        role: "librador",
+        identity: { nationalId: "30123456", sexo: "F" },
+      },
+      PLAN,
+    );
 
     expect(recorder.created[0]?.identitySubject).toEqual({ dni: "30123456", sexo: "F" });
   });
@@ -209,7 +246,7 @@ describe("openCeremony", () => {
   it("uses the session id as the ceremony id, so a webhook routes without a lookup table", async () => {
     const { provider } = build();
 
-    const ceremony = await provider.openCeremony(SEALED, { role: "librador" });
+    const ceremony = await provider.openCeremony(SEALED, { role: "librador" }, PLAN);
 
     expect(ceremony.ceremonyId).toBe(SESSION_ID);
     expect(ceremony.documentId).toBe(SEALED.documentId);
@@ -304,8 +341,6 @@ describe("verifyArtifact", () => {
     const probe = new LakautSignatureProvider({
       sessions,
       allowedOrigin: "https://dev.lucerolabs.xyz",
-      flowType: "SIGNING",
-      authenticationProfileId: "auth.email.v1",
       now,
     });
 
@@ -340,10 +375,14 @@ describe("what can reach a browser or a log", () => {
   it("never carries the API key into the ceremony handed to a client", async () => {
     const { provider } = build();
 
-    const ceremony = await provider.openCeremony(SEALED, {
-      role: "librador",
-      identity: { nationalId: "30123456", sexo: "F" },
-    });
+    const ceremony = await provider.openCeremony(
+      SEALED,
+      {
+        role: "librador",
+        identity: { nationalId: "30123456", sexo: "F" },
+      },
+      PLAN,
+    );
     const serialised = JSON.stringify(ceremony);
 
     expect(serialised).not.toContain(API_KEY);
@@ -352,10 +391,14 @@ describe("what can reach a browser or a log", () => {
   it("never carries a DNI into the ceremony, even when one was bound", async () => {
     const { provider } = build();
 
-    const ceremony = await provider.openCeremony(SEALED, {
-      role: "librador",
-      identity: { nationalId: "30123456", sexo: "F" },
-    });
+    const ceremony = await provider.openCeremony(
+      SEALED,
+      {
+        role: "librador",
+        identity: { nationalId: "30123456", sexo: "F" },
+      },
+      PLAN,
+    );
 
     // identitySubject is server-side only and must not survive into the renderer
     // context (STYLES 8.1, 8.2).

@@ -13,6 +13,7 @@ import type {
   Ceremony,
   CeremonyId,
   CeremonyLedger,
+  CeremonyPlan,
   CeremonyStatus,
   Clock,
   CustodySink,
@@ -63,13 +64,17 @@ export class DefaultSigningCore implements SigningCore {
     });
   }
 
-  async openCeremony(documentId: DocumentId, signer: SignerRole): Promise<Ceremony> {
+  async openCeremony(
+    documentId: DocumentId,
+    signer: SignerRole,
+    plan: CeremonyPlan,
+  ): Promise<Ceremony> {
     const document = await this.#documents.get(documentId);
     if (document === undefined) {
       throw new DocumentNotSealedError(documentId);
     }
 
-    const ceremony = await this.#provider.openCeremony(document, signer);
+    const ceremony = await this.#provider.openCeremony(document, signer, plan);
     await this.#ceremonies.record(ceremony);
     return ceremony;
   }

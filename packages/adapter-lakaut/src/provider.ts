@@ -25,8 +25,11 @@
  */
 
 import type {
+  AuthenticationFactors,
   Ceremony,
   CeremonyId,
+  CeremonyJourney,
+  CeremonyPlan,
   CeremonyState,
   CeremonyStatus,
   Clock,
@@ -74,10 +77,43 @@ export interface LakautProviderOptions {
    * Hosted UI reaches the page by `postMessage`, which demands an exact target.
    */
   readonly allowedOrigin: string;
-  readonly flowType: SdkFlowType;
-  /** Always explicit — the default resolves differently per journey (STYLES §9.4). */
-  readonly authenticationProfileId: AuthenticationProfileId;
   readonly now: Clock;
+}
+
+/**
+ * States a ceremony's journey in Lakaut's vocabulary.
+ *
+ * No `default`: adding a journey to the port leaves this function with a path
+ * that returns nothing, which is a compile error rather than a silent fallback
+ * to whichever flow happened to be listed first.
+ */
+function toFlowType(journey: CeremonyJourney): SdkFlowType {
+  switch (journey) {
+    case "signing":
+      return "SIGNING";
+    case "onboarding-and-signing":
+      return "ONBOARDING_AND_SIGNING";
+  }
+}
+
+/**
+ * States a ceremony's factor set as a contracted profile id.
+ *
+ * Sent on every session and never omitted: Lakaut resolves an absent profile
+ * differently for `flowType` than for `journeyId` (STYLES §9.4). Which pairings
+ * the contract actually permits is the catalogue's answer, not this function's —
+ * `journey.onboarding-signing.v1` currently accepts only `auth.email-sms.v1`,
+ * and the provider rejects the rest rather than this code pre-empting it.
+ */
+function toProfileId(factors: AuthenticationFactors): AuthenticationProfileId {
+  switch (factors) {
+    case "email":
+      return "auth.email.v1";
+    case "sms":
+      return "auth.sms.v1";
+    case "email-and-sms":
+      return "auth.email-sms.v1";
+  }
 }
 
 /**
@@ -107,24 +143,24 @@ function toCeremonyState(status: SdkSessionStatus): CeremonyState {
 export class LakautSignatureProvider implements SignatureProvider {
   readonly #sessions: LakautSessions;
   readonly #allowedOrigin: string;
-  readonly #flowType: SdkFlowType;
-  readonly #authenticationProfileId: AuthenticationProfileId;
   readonly #now: Clock;
 
   constructor(options: LakautProviderOptions) {
     this.#sessions = options.sessions;
     this.#allowedOrigin = options.allowedOrigin;
-    this.#flowType = options.flowType;
-    this.#authenticationProfileId = options.authenticationProfileId;
     this.#now = options.now;
   }
 
-  async openCeremony(document: SealedDocument, signer: SignerRole): Promise<Ceremony> {
+  async openCeremony(
+    document: SealedDocument,
+    signer: SignerRole,
+    plan: CeremonyPlan,
+  ): Promise<Ceremony> {
     // Optional fields by conditional spread: `exactOptionalPropertyTypes` makes
     // assigning `undefined` a type error, not a no-op (STYLES §4).
     const input: CreateSessionInput = {
-      flowType: this.#flowType,
-      authenticationProfileId: this.#authenticationProfileId,
+      flowType: toFlowType(plan.journey),
+      authenticationProfileId: toProfileId(plan.factors),
       allowedOrigin: this.#allowedOrigin,
       capabilities: ["signed-document-reconciliation:1.2"],
       ...(signer.email !== undefined ? { email: signer.email } : {}),

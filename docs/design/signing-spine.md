@@ -135,6 +135,35 @@ and `TextEncoder` are read structurally off `globalThis` and their absence
 throws `HashUnavailableError`. That keeps `core` dependency-free and
 runtime-agnostic, and keeps its tests free of runtime globals (STYLES §1.1, §10).
 
+### 2.8 The journey is per ceremony, not per deployment
+
+An earlier draft of `LakautProviderOptions` fixed `flowType` and
+`authenticationProfileId` at construction, so one provider instance served one
+journey. That is wrong, and the SDK says so: `getSigningEligibility` returns a
+`recommendedJourneyId` **per identity**. Whether a signer needs onboarding is a
+fact about the person, and pinning it to process configuration puts signer data
+in a deployment file.
+
+So `openCeremony` takes a third argument, `CeremonyPlan`, carrying a
+provider-free `journey` and `factors`. The adapter maps each onto Lakaut's
+vocabulary through a `switch` with no `default`, the same shape `toCeremonyState`
+uses — adding a journey to the port then fails to compile rather than falling
+through. A total `Record` would have read better and cannot be used:
+`noUncheckedIndexedAccess` makes every lookup `T | undefined`, and `!` is
+forbidden (STYLES §4).
+
+Neither value is defaulted. The vendor's own default resolves differently for
+`flowType` than for `journeyId` (STYLES §9.4), and the two flows are not
+interchangeable anyway: the preproduction catalogue lists
+`journey.onboarding-signing.v1` with `auth.email-sms.v1` only, whose
+`requiredInputs` are `EMAIL` **and** `PHONE`, while `journey.signing.v1` accepts
+all three profiles. A caller switching journeys is also switching which fields it
+has to collect.
+
+The adapter does not pre-validate the pairing. Which combinations the contract
+permits is the catalogue's answer, asserted at boot (STYLES §9.4); duplicating it
+here would be a second copy to drift.
+
 ## 3 · What fails closed
 
 - `seal` refuses bytes with no `%PDF-` header, bytes over the provider's own

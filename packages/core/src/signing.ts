@@ -59,6 +59,40 @@ export interface SignerRole {
 }
 
 /**
+ * What a ceremony has to accomplish for its signer.
+ *
+ * Per ceremony rather than per deployment, because it is a fact about the
+ * person: a signer who already holds a certificate needs `signing`, and one who
+ * does not needs `onboarding-and-signing`. The provider itself computes this
+ * per identity — Lakaut's eligibility read returns a recommended journey — so
+ * fixing it at construction would put signer data in process configuration.
+ */
+export type CeremonyJourney = "signing" | "onboarding-and-signing";
+
+/**
+ * Which factors the signer clears before the ceremony proceeds.
+ *
+ * Always stated, never defaulted: a provider's own default resolves differently
+ * per journey, and a silently-resolved factor set is a signer who was asked for
+ * less than intended (STYLES §9.4). Which combinations a provider actually
+ * allows is its business, asserted against its catalogue rather than encoded
+ * here.
+ */
+export type AuthenticationFactors = "email" | "sms" | "email-and-sms";
+
+/**
+ * How one ceremony is to be run, decided per signer.
+ *
+ * Separate from `SignerRole` because it describes the ceremony, not the person:
+ * the same debtor is `signing` on their second pagaré and
+ * `onboarding-and-signing` on their first.
+ */
+export interface CeremonyPlan {
+  readonly journey: CeremonyJourney;
+  readonly factors: AuthenticationFactors;
+}
+
+/**
  * What the client hands to its renderer, opaque to the core.
  *
  * Provider-shaped by necessity and never logged: for Lakaut this is exactly
@@ -161,7 +195,7 @@ export interface SignedDelivery {
 
 /** The only seam a signature provider sits behind. Implemented in the adapter. */
 export interface SignatureProvider {
-  openCeremony(document: SealedDocument, signer: SignerRole): Promise<Ceremony>;
+  openCeremony(document: SealedDocument, signer: SignerRole, plan: CeremonyPlan): Promise<Ceremony>;
   authoritativeStatus(ceremonyId: CeremonyId): Promise<CeremonyStatus>;
   verifyArtifact(delivery: SignedDelivery, custody: CustodySink): Promise<VerifiedArtifact>;
 }
@@ -196,7 +230,7 @@ export interface CeremonyLedger {
 /** What a client product drives. Takes its ports as constructor parameters (§2). */
 export interface SigningCore {
   seal(bytes: Uint8Array, reference: string): Promise<SealedDocument>;
-  openCeremony(documentId: DocumentId, signer: SignerRole): Promise<Ceremony>;
+  openCeremony(documentId: DocumentId, signer: SignerRole, plan: CeremonyPlan): Promise<Ceremony>;
   ingest(delivery: SignedDelivery, custody: CustodySink): Promise<VerifiedArtifact>;
   reconcile(ceremonyId: CeremonyId): Promise<CeremonyStatus>;
 }

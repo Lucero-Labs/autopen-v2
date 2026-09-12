@@ -9,6 +9,7 @@ import { DefaultSigningCore } from "../src/signing-core.js";
 import type {
   Ceremony,
   CeremonyId,
+  CeremonyPlan,
   CeremonyStatus,
   Clock,
   ContentHash,
@@ -25,6 +26,7 @@ import { InMemoryCeremonyLedger, InMemoryDocumentStore } from "../src/stores.js"
 const AT = new Date("2026-09-11T12:00:00.000Z");
 const now: Clock = () => AT;
 const SIGNER: SignerRole = { role: "librador" };
+const PLAN: CeremonyPlan = { journey: "signing", factors: "email" };
 
 /** ASCII bytes, hand-encoded so core's tests stay free of runtime globals (STYLES 10). */
 function ascii(text: string): Uint8Array {
@@ -38,12 +40,18 @@ function pdf(body: string): Uint8Array {
 /** Records what the core asked of a provider, and answers however a test needs. */
 class FakeProvider implements SignatureProvider {
   readonly opened: SealedDocument[] = [];
+  readonly plans: CeremonyPlan[] = [];
   readonly statusCalls: CeremonyId[] = [];
   custodyRan = false;
   verifyThrows: Error | undefined;
 
-  async openCeremony(document: SealedDocument): Promise<Ceremony> {
+  async openCeremony(
+    document: SealedDocument,
+    _signer: SignerRole,
+    plan: CeremonyPlan,
+  ): Promise<Ceremony> {
     this.opened.push(document);
+    this.plans.push(plan);
     return {
       ceremonyId: "ceremony-1" as CeremonyId,
       documentId: document.documentId,
@@ -100,9 +108,9 @@ describe("openCeremony", () => {
   it("refuses a document that was never sealed rather than asking the provider", async () => {
     const { core, provider } = build();
 
-    await expect(core.openCeremony("not-sealed" as DocumentId, SIGNER)).rejects.toBeInstanceOf(
-      DocumentNotSealedError,
-    );
+    await expect(
+      core.openCeremony("not-sealed" as DocumentId, SIGNER, PLAN),
+    ).rejects.toBeInstanceOf(DocumentNotSealedError);
     expect(provider.opened).toHaveLength(0);
   });
 
@@ -110,7 +118,7 @@ describe("openCeremony", () => {
     const { core, ceremonies } = build();
     const sealed = await core.seal(pdf("uno"), "ar.pagare/0001");
 
-    const ceremony = await core.openCeremony(sealed.documentId, SIGNER);
+    const ceremony = await core.openCeremony(sealed.documentId, SIGNER, PLAN);
 
     expect(await ceremonies.get(ceremony.ceremonyId)).toEqual(ceremony);
   });
@@ -119,9 +127,25 @@ describe("openCeremony", () => {
     const { core, provider } = build();
     const sealed = await core.seal(pdf("uno"), "ar.pagare/0001");
 
-    await core.openCeremony(sealed.documentId, SIGNER);
+    await core.openCeremony(sealed.documentId, SIGNER, PLAN);
 
     expect(provider.opened[0]?.contentHash).toBe(sealed.contentHash);
+  });
+
+  it("passes the caller's plan through, so one core serves both journeys", async () => {
+    const { core, provider } = build();
+    const sealed = await core.seal(pdf("uno"), "ar.pagare/0001");
+
+    await core.openCeremony(sealed.documentId, SIGNER, PLAN);
+    await core.openCeremony(sealed.documentId, SIGNER, {
+      journey: "onboarding-and-signing",
+      factors: "email-and-sms",
+    });
+
+    expect(provider.plans).toEqual([
+      { journey: "signing", factors: "email" },
+      { journey: "onboarding-and-signing", factors: "email-and-sms" },
+    ]);
   });
 });
 
@@ -142,7 +166,7 @@ function delivery(overrides: Partial<SignedDelivery> = {}): SignedDelivery {
 async function readyToIngest() {
   const built = build();
   const sealed = await built.core.seal(pdf("uno"), "ar.pagare/0001");
-  const ceremony = await built.core.openCeremony(sealed.documentId, SIGNER);
+  const ceremony = await built.core.openCeremony(sealed.documentId, SIGNER, PLAN);
   return { ...built, sealed, ceremony };
 }
 
@@ -202,7 +226,7 @@ describe("ingest", () => {
     provider.verifyThrows = new Error("SIGN_DOCUMENT_CONFLICT");
     const built = build(provider);
     const sealed = await built.core.seal(pdf("uno"), "ar.pagare/0001");
-    const ceremony = await built.core.openCeremony(sealed.documentId, SIGNER);
+    const ceremony = await built.core.openCeremony(sealed.documentId, SIGNER, PLAN);
 
     const failure = await built.core
       .ingest(
