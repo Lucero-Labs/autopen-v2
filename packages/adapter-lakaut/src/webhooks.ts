@@ -1,13 +1,22 @@
 /**
  * Webhook ingress: the only channel that closes an operation without a browser.
  *
- * Two surfaces that look alike and are not. The *challenge* proves we control
- * the endpoint; it is signed with different material and different headers, and
- * the vendor is explicit that it must never reach `constructWebhookEvent`
- * (`sdk-integracion__configurar-webhook.md`). The *events* are business facts
- * about a ceremony. Both are verified by the SDK rather than by hand: a
- * parallel HMAC implementation is one subtle bug away from accepting forged
- * events, and the vendor says as much.
+ * Two surfaces that arrive at one URL and share nothing else. The *challenge*
+ * proves we control the endpoint; the *events* are business facts about a
+ * ceremony. They differ in every part of their verification:
+ *
+ * | | Challenge | Event |
+ * | --- | --- | --- |
+ * | Headers | `Lakaut-Webhook-Id`, `-Timestamp`, `-Signature` | `Lakaut-Event-Id`, `-Type`, `-Timestamp`, `Lakaut-Signature`, `Lakaut-Schema-Version` |
+ * | Signature | `v1=<hex>` | `t=<ts>,v1=<hex>` |
+ * | Signed over | `<timestamp>.<rawBody>` | `<timestamp>.<eventId>.<rawBody>` |
+ *
+ * So the vendor's instruction that a challenge must never reach
+ * `constructWebhookEvent` is not a stylistic one — nothing about the two lines
+ * up (`sdk-integracion__configurar-webhook.md`, `__eventos-estado.md`). Both
+ * are verified by the SDK rather than by hand: a parallel HMAC implementation
+ * is one subtle bug away from accepting forged events, and the vendor says as
+ * much.
  *
  * Everything here takes raw bytes. Parsing and re-serialising breaks the HMAC —
  * it is computed over exactly what arrived (STYLES §9.1). The body is parsed
