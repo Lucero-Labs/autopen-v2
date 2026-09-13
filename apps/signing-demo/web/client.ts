@@ -198,6 +198,7 @@ form.addEventListener("submit", (submission) => {
             event.step !== undefined ? `step=${event.step}` : "",
             event.errorCode !== undefined ? `errorCode=${event.errorCode}` : "",
             event.retryable !== undefined ? `retryable=${String(event.retryable)}` : "",
+            event.disposition !== undefined ? `disposition=${event.disposition}` : "",
             event.safeMessage ?? "",
           ]
             .filter((part) => part !== "")

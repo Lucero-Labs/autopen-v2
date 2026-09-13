@@ -20,6 +20,7 @@
  */
 
 import type {
+  CeremonyDisposition,
   CeremonyHandoff,
   CeremonyId,
   ContentHash,
@@ -33,6 +34,8 @@ import type {
   SessionForRenderer,
   SignedDocumentArtifact,
 } from "@lakaut/browser";
+
+import { dispositionForFailure } from "./disposition.js";
 
 /** What a mounted ceremony offers its host: the ability to take it down. */
 export interface MountedCeremony {
@@ -56,10 +59,17 @@ export interface CeremonyEvent {
   readonly errorCode?: string;
   readonly safeMessage?: string;
   readonly retryable?: boolean;
+  /** Present on a failure. What to do about it — see `dispositionForFailure`. */
+  readonly disposition?: CeremonyDisposition;
 }
 
 /** Flattens the vendor's discriminated union without losing its failure detail. */
 function toCeremonyEvent(event: BrowserLifecycleEvent): CeremonyEvent {
+  const disposition =
+    "errorCode" in event
+      ? dispositionForFailure({ errorCode: event.errorCode, retryable: event.retryable })
+      : undefined;
+
   return Object.freeze({
     type: event.type,
     ...("step" in event ? { step: event.step } : {}),
@@ -68,6 +78,7 @@ function toCeremonyEvent(event: BrowserLifecycleEvent): CeremonyEvent {
       ? { safeMessage: event.safeMessage }
       : {}),
     ...("retryable" in event ? { retryable: event.retryable } : {}),
+    ...(disposition !== undefined ? { disposition } : {}),
   });
 }
 

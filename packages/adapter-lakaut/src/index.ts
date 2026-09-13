@@ -13,6 +13,8 @@ export {
   type SigningEligibility,
 } from "./client.js";
 
+export { dispositionForFailure, type FailureSignal } from "./disposition.js";
+
 export {
   answerWebhookChallenge,
   isWebhookChallenge,
