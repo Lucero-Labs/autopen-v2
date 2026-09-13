@@ -8,12 +8,14 @@ import type {
   SealedDocument,
   SignedDelivery,
 } from "@autopen/core";
-import type {
-  AuthoritativeSessionStatus,
-  CreateSessionInput,
-  CreateSessionOutput,
-  SdkErrorCategory,
-  SdkSessionStatus,
+import {
+  AUTH_ERROR_CODES,
+  type AuthoritativeSessionStatus,
+  categoryFor,
+  type CreateSessionInput,
+  type CreateSessionOutput,
+  type SdkErrorCategory,
+  type SdkSessionStatus,
 } from "@lakaut/shared-contracts";
 import { describe, expect, it } from "vitest";
 
@@ -368,6 +370,33 @@ describe("the error taxonomy stays aligned with the SDK's", () => {
       "session-recovery",
       "terminal",
     ]);
+  });
+
+  /**
+   * Observed on 2026-09-12: a preproduction ceremony ended with
+   * `lakaut.flow.failed`, `errorCode: "document_sign_failed"`,
+   * `retryable: false`.
+   *
+   * Two documented claims are false at the same time.
+   * `sdk-integracion__referencia-api.md` says `document_sign_failed` *"no llega
+   * como errorCode de un evento de ciclo de vida"* — it did — and the code is
+   * absent from `LakautSdkErrorCode`, the union STYLES §9.3 asks handlers to be
+   * exhaustive over. So an exhaustive handler cannot match it, and it falls to
+   * `categoryFor`'s default.
+   *
+   * That default is `retry-in-step`, which §9.3 chose because escalating costs
+   * the whole flow. Here it is the wrong direction: the event says
+   * `retryable: false`, and retrying puts the signer back through a step that
+   * cannot succeed. The event's own `retryable` outranks the classifier.
+   *
+   * This test pins the drift. It fails when Lakaut declares the code, which is
+   * when the workaround can go.
+   */
+  it("classifies document_sign_failed only by default, because the SDK does not declare it", () => {
+    const undeclared = "document_sign_failed";
+
+    expect(AUTH_ERROR_CODES).not.toContain(undeclared);
+    expect(categoryFor(undeclared)).toBe("retry-in-step");
   });
 });
 

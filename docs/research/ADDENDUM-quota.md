@@ -89,7 +89,71 @@ not exist.
 The experiment that settles it is onboarding a **second, different identity**
 and observing whether it arrives with its own two firmas.
 
-## 5 · Consequences for the architecture
+## 5 · The service emits a code the SDK does not declare
+
+A third ceremony, run once the balance was already zero, ended with:
+
+```
+lakaut.flow.failed  errorCode=document_sign_failed  retryable=false
+"The signing step cannot continue for this session."
+```
+
+It never reached the key screen — fourteen seconds separate `step_completed
+step=email_otp` from the failure — which settles §4's other half: **the PIN was
+never the problem.** Earlier runs offered a key screen; this one does not.
+
+Two documented claims fail at once.
+
+`sdk-integracion__referencia-api.md` states that *"`document_sign_failed` y
+`signed_document_recovery_required` existen en `SdkPublicErrorCode` pero no
+llegan como `errorCode` de un evento de ciclo de vida"*. It arrived as exactly
+that.
+
+And the code is absent from `LakautSdkErrorCode`, the 34-member union STYLES
+§9.3 asks handlers to be exhaustive over. An exhaustive handler cannot match it,
+so it falls through to `categoryFor`, whose default is `retry-in-step`.
+
+**Here that default is the wrong direction.** §9.3 chose it because escalating
+costs the whole flow, and being wrong that way costs one retry. But the event
+says `retryable: false`: retrying returns the signer to a step that cannot
+succeed, and no number of retries changes it. For browser lifecycle events the
+event's own `retryable` outranks the classifier, and §9.3's rule should be read
+as applying to the server error space, not this one.
+
+Pinned by a test in `provider.test.ts`, which fails once Lakaut declares the
+code.
+
+## 6 · A failed signature is invisible to the backend
+
+The webhook destination is **Verificado** and the challenge verified against our
+endpoint. The ceremony above then failed, terminally, from the signer's point of
+view — and **no event was delivered**. Ninety seconds of polling, nothing.
+
+Nor should there have been, on the vendor's model: the *step* failed, the
+*session* did not. `getSession` still reports `state: open`, `errorCode: null`.
+There is no session-level transition, so there is no `auth.session.failed`.
+
+The consequence is worth stating plainly. A signature can fail terminally for
+the user while every backend channel reports a healthy, open session:
+
+| Channel | What it said |
+| --- | --- |
+| Browser event | `document_sign_failed`, `retryable: false` |
+| `getSession` | `open`, `errorCode: null` |
+| Document status | `404 FORBIDDEN` |
+| Webhook | nothing |
+
+STYLES §9.1 says browser events can be lost and the backend is authoritative.
+Both remain true. But this is the case the rule does not cover: the browser is
+the *only* channel carrying the fact, and it is the one channel we are told not
+to trust. A lost event here is a signer who saw a failure and a backend that
+never learns of it.
+
+Practical consequence for the core: a ceremony that stops emitting events
+without reaching a terminal session state has to be swept — an open session with
+no progress and no terminal transition is a real outcome, not a stuck record.
+
+## 7 · Consequences for the architecture
 
 If §4 resolves to per-signer, capacity is metered per borrower in a product
 where every borrower signs, and the multi-tenancy note in AGENTS.md gains a
@@ -100,7 +164,7 @@ Either way, §3 stands on its own. A terminal error with no observable
 precondition and no programmatic remedy has to be handled as an operational
 event — which means it needs a webhook, an alert and a human, not a retry.
 
-## 6 · Questions for Lakaut
+## 8 · Questions for Lakaut
 
 1. Is there an API to read a signer's remaining signature balance?
 2. Can an integrator allocate or purchase signatures on a signer's behalf?
@@ -111,3 +175,9 @@ event — which means it needs a webhook, an alert and a human, not a retry.
 6. Please top up the preproduction balance for `lucerosa`.
 7. The **Cargando alcance contratado…** panel never loads in the PREPROD
    dashboard.
+8. `document_sign_failed` arrived as a lifecycle `errorCode`, which
+   `referencia-api.md` says cannot happen, and it is not in
+   `LakautSdkErrorCode`. Which is wrong, the docs or the union?
+9. Should a terminal signing-step failure produce a webhook? Today the session
+   stays `open` and nothing is delivered, so the browser event is the only
+   record that the signature failed.
