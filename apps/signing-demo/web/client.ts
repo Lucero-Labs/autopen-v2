@@ -197,15 +197,28 @@ form.addEventListener("submit", (submission) => {
         String(fields.get("reference")),
       );
 
-      if (verdict.journey !== undefined && verdict.journey !== chosen) {
+      // `auto` follows the provider, which is right by default because the
+      // journey is a fact about the signer. An explicit choice still wins: the
+      // recommendation is not omniscient — it does not account for signature
+      // quota — so overriding it stays possible, just never accidental.
+      if (chosen === "auto") {
+        if (verdict.journey === undefined) {
+          say(`el proveedor no recomienda ningún journey (${verdict.decision})`, true);
+          return;
+        }
+        applyRecommendation(verdict.journey);
+      } else if (verdict.journey !== undefined && verdict.journey !== chosen) {
         say(`el proveedor recomienda ${verdict.journey}, no ${chosen} — abriendo igual`, true);
       }
 
       say("abriendo ceremonia…");
 
+      // Re-read: `applyRecommendation` may have changed both selects.
+      const plan = new FormData(form);
+
       const opened = (await post("/api/ceremonies", {
-        journey: fields.get("journey"),
-        factors: fields.get("factors"),
+        journey: plan.get("journey"),
+        factors: plan.get("factors"),
         email: fields.get("email"),
         phone: fields.get("phone"),
         reference: fields.get("reference"),
