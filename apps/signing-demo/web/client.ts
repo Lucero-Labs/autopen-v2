@@ -46,8 +46,11 @@ let mounted: MountedCeremony | undefined;
 (form.elements.namedItem("reference") as HTMLInputElement).value =
   `ar.pagare/demo-${Math.random().toString(36).slice(2, 8)}`;
 
-/** The email the last successful eligibility read was for, if any. */
-let eligibilityFor: string | undefined;
+interface Eligibility {
+  readonly decision: string;
+  readonly journey?: string;
+  readonly nextAction: string;
+}
 
 function say(line: string, fault = false): void {
   const entry = document.createElement("div");
@@ -128,48 +131,44 @@ async function reconcile(ceremonyId: string): Promise<void> {
 }
 
 /**
- * Asks the provider which journey this signer needs, and selects it.
+ * Reads eligibility and reports it. Free — no session, no document, no PIN.
  *
- * Free — no session, no document, no PIN. It answers whether a certificate
- * exists and nothing more: a signer with no signature balance still reads as
- * READY_FOR_SIGNING, so a green answer here does not promise the ceremony can
- * finish (docs/research/ADDENDUM-quota.md).
+ * It answers whether a certificate exists and nothing more: a signer with no
+ * signature balance still reads as READY_FOR_SIGNING, so a green answer here
+ * does not promise the ceremony can finish
+ * (`docs/research/ADDENDUM-quota.md` §2).
  */
+async function readEligibility(email: string, reference: string): Promise<Eligibility> {
+  const verdict = (await post("/api/eligibility", { email, reference })) as Eligibility;
+  say(`elegibilidad: ${verdict.decision}  nextAction=${verdict.nextAction}`);
+  return verdict;
+}
+
+/** Applies a recommendation to the form, including the factors it implies. */
+function applyRecommendation(journey: string): void {
+  (form.elements.namedItem("journey") as HTMLSelectElement).value = journey;
+  say(`journey seleccionado: ${journey}`);
+
+  // The only pairing the catalogue allows for onboarding is email+sms, whose
+  // required inputs are EMAIL and PHONE.
+  if (journey === "onboarding-and-signing") {
+    (form.elements.namedItem("factors") as HTMLSelectElement).value = "email-and-sms";
+    say("factors ajustado a email-and-sms — onboarding exige email y teléfono");
+  }
+}
+
 check.addEventListener("click", () => {
   const fields = new FormData(form);
 
   void (async () => {
     try {
-      const verdict = (await post("/api/eligibility", {
-        email: fields.get("email"),
-        reference: fields.get("reference"),
-      })) as {
-        readonly decision: string;
-        readonly journey?: string;
-        readonly nextAction: string;
-        readonly correlationId: string;
-      };
-
-      say(`elegibilidad: ${verdict.decision}  nextAction=${verdict.nextAction}`);
-      eligibilityFor = String(fields.get("email"));
-
-      if (verdict.journey !== undefined) {
-        const select = form.elements.namedItem("journey") as HTMLSelectElement;
-        select.value = verdict.journey;
-        say(`journey seleccionado: ${verdict.journey}`);
-
-        // The only pairing the catalogue allows for onboarding is email+sms,
-        // whose required inputs are EMAIL and PHONE.
-        if (verdict.journey === "onboarding-and-signing") {
-          (form.elements.namedItem("factors") as HTMLSelectElement).value = "email-and-sms";
-          say("factors ajustado a email-and-sms — onboarding exige email y teléfono");
-        }
-      }
-
-      say(
-        "ojo: la elegibilidad no contempla el saldo de firma",
-        verdict.decision === "READY_FOR_SIGNING",
+      log.replaceChildren();
+      const verdict = await readEligibility(
+        String(fields.get("email")),
+        String(fields.get("reference")),
       );
+      if (verdict.journey !== undefined) applyRecommendation(verdict.journey);
+      say("ojo: la elegibilidad no contempla el saldo de firma");
     } catch (error) {
       say(`error: ${error instanceof Error ? error.message : "desconocido"}`, true);
     }
@@ -184,15 +183,25 @@ form.addEventListener("submit", (submission) => {
     try {
       mounted?.destroy();
       log.replaceChildren();
-      say("abriendo ceremonia…");
+      // Always read eligibility first. It is free, and opening the wrong
+      // journey is not: SIGNING against an identity holding no certificate
+      // authenticates by OTP and only then discovers there is nothing to sign
+      // with, so the signer spends a code to reach a wall.
+      //
+      // It informs rather than decides. The selector is the caller's explicit
+      // choice and stays authoritative — a disagreement is worth saying out
+      // loud, not worth refusing over.
+      const chosen = String(fields.get("journey"));
+      const verdict = await readEligibility(
+        String(fields.get("email")),
+        String(fields.get("reference")),
+      );
 
-      // Opening without a confirmed recommendation is how a signer ends up in
-      // the wrong journey: SIGNING against an identity holding no certificate
-      // authenticates and then fails, having spent an OTP for nothing.
-      if (eligibilityFor !== fields.get("email")) {
-        say("sin elegibilidad confirmada para este email — consultala primero", true);
-        return;
+      if (verdict.journey !== undefined && verdict.journey !== chosen) {
+        say(`el proveedor recomienda ${verdict.journey}, no ${chosen} — abriendo igual`, true);
       }
+
+      say("abriendo ceremonia…");
 
       const opened = (await post("/api/ceremonies", {
         journey: fields.get("journey"),
