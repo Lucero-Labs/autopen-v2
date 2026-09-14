@@ -153,7 +153,41 @@ Practical consequence for the core: a ceremony that stops emitting events
 without reaching a terminal session state has to be swept — an open session with
 no progress and no terminal transition is a real outcome, not a stuck record.
 
-## 7 · Consequences for the architecture
+## 7 · `externalUserRef` binds permanently to one email
+
+Verified 2026-09-13. The eligibility read accepts a `(externalUserRef, email)`
+pair, and the first pairing is permanent:
+
+| externalUserRef | email | Result |
+| --- | --- | --- |
+| `ar.pagare/fresh-a1` | `lucero@lucerolabs.xyz` (first use) | `ONBOARDING_REQUIRED` |
+| `ar.pagare/fresh-a1` | `lucero@lucerolabs.xyz` (again) | `ONBOARDING_REQUIRED` |
+| `ar.pagare/fresh-a1` | `otro@lucerolabs.xyz` | **`400 INVALID_REQUEST`** |
+| `ar.pagare/demo-0001` | `scammi@gmail.com` (first use) | `READY_FOR_SIGNING` |
+| `ar.pagare/demo-0001` | `hello@lucerolabs.xyz` | **`400 INVALID_REQUEST`** |
+
+Defensible as a design — `externalUserRef` is our stable handle for a person, so
+binding it to an identity is what makes it a handle. It is the *diagnosis* that
+fails. The body is:
+
+```json
+{"code":"INVALID_REQUEST","message":"Request could not be processed"}
+```
+
+Nothing names the reference, the conflict, or the email it is already bound to.
+
+This is not academic. It cost a real ceremony: the eligibility read failed with
+that opaque 400, the demo's journey selector kept its default, and a `SIGNING`
+session was opened for an identity holding no certificate — which authenticates
+by OTP first and only then discovers there is nothing to sign with. The signer
+spends an OTP to reach a wall.
+
+Two consequences the core inherits. A reference is single-use per signer, so
+generating one per loan is fine and reusing one across borrowers is a hard
+failure. And eligibility failing is not a soft condition to log past: it means
+the journey is unknown, and opening a ceremony anyway picks one at random.
+
+## 8 · Consequences for the architecture
 
 If §4 resolves to per-signer, capacity is metered per borrower in a product
 where every borrower signs, and the multi-tenancy note in AGENTS.md gains a
@@ -164,7 +198,7 @@ Either way, §3 stands on its own. A terminal error with no observable
 precondition and no programmatic remedy has to be handled as an operational
 event — which means it needs a webhook, an alert and a human, not a retry.
 
-## 8 · Questions for Lakaut
+## 9 · Questions for Lakaut
 
 1. Is there an API to read a signer's remaining signature balance?
 2. Can an integrator allocate or purchase signatures on a signer's behalf?
@@ -181,3 +215,5 @@ event — which means it needs a webhook, an alert and a human, not a retry.
 9. Should a terminal signing-step failure produce a webhook? Today the session
    stays `open` and nothing is delivered, so the browser event is the only
    record that the signature failed.
+10. Reusing an `externalUserRef` with a second email returns a bare
+    `INVALID_REQUEST`. Is the binding intentional, and can the error say so?

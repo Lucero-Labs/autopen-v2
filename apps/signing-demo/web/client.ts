@@ -32,6 +32,23 @@ const check = document.querySelector("#check") as HTMLButtonElement;
 
 let mounted: MountedCeremony | undefined;
 
+/**
+ * A reference nobody has used before, generated per page load.
+ *
+ * `externalUserRef` binds permanently to the first email it is seen with —
+ * undocumented, and verified against preproduction on 2026-09-13. Reusing one
+ * with a different signer fails the eligibility read with a bare
+ * `INVALID_REQUEST` that names neither the reference nor the conflict, and the
+ * form then falls through to whatever journey happened to be selected.
+ *
+ * A fresh reference per load makes that unreachable by accident.
+ */
+(form.elements.namedItem("reference") as HTMLInputElement).value =
+  `ar.pagare/demo-${Math.random().toString(36).slice(2, 8)}`;
+
+/** The email the last successful eligibility read was for, if any. */
+let eligibilityFor: string | undefined;
+
 function say(line: string, fault = false): void {
   const entry = document.createElement("div");
   entry.textContent = `${new Date().toLocaleTimeString("es-AR")}  ${line}`;
@@ -134,6 +151,7 @@ check.addEventListener("click", () => {
       };
 
       say(`elegibilidad: ${verdict.decision}  nextAction=${verdict.nextAction}`);
+      eligibilityFor = String(fields.get("email"));
 
       if (verdict.journey !== undefined) {
         const select = form.elements.namedItem("journey") as HTMLSelectElement;
@@ -167,6 +185,14 @@ form.addEventListener("submit", (submission) => {
       mounted?.destroy();
       log.replaceChildren();
       say("abriendo ceremonia…");
+
+      // Opening without a confirmed recommendation is how a signer ends up in
+      // the wrong journey: SIGNING against an identity holding no certificate
+      // authenticates and then fails, having spent an OTP for nothing.
+      if (eligibilityFor !== fields.get("email")) {
+        say("sin elegibilidad confirmada para este email — consultala primero", true);
+        return;
+      }
 
       const opened = (await post("/api/ceremonies", {
         journey: fields.get("journey"),
