@@ -311,7 +311,12 @@ async function serveStatic(path: string, response: ServerResponse): Promise<void
 
   const body = await readFile(join(WEB, name));
   response
-    .writeHead(200, { "content-type": CONTENT_TYPES[extname(name)] ?? "text/plain" })
+    .writeHead(200, {
+      "content-type": CONTENT_TYPES[extname(name)] ?? "text/plain",
+      // A rebuilt bundle must reach the page on reload. A stale `client.js` is
+      // indistinguishable from a fix that did not work.
+      "cache-control": "no-store",
+    })
     .end(body);
 }
 
@@ -429,14 +434,23 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
   if (request.method === "POST" && url.pathname === "/api/eligibility") {
     const body = await readBody(request);
     if (!isObject(body)) throw new Error("body must be an object");
-    json(
-      response,
-      200,
-      await checkSigningEligibility(LAKAUT, {
-        email: readString(body, "email"),
-        externalUserRef: readString(body, "reference"),
-      }),
-    );
+    const reference = readString(body, "reference");
+    try {
+      json(
+        response,
+        200,
+        await checkSigningEligibility(LAKAUT, {
+          email: readString(body, "email"),
+          externalUserRef: reference,
+        }),
+      );
+    } catch (error) {
+      // The reference is our own identifier and safe to log; the email is not
+      // (STYLES §8.1). A reused reference is the documented cause of a bare
+      // INVALID_REQUEST here, so naming it is the whole diagnosis.
+      console.error(`eligibility failed for reference=${reference}: ${describe(error)}`);
+      throw error;
+    }
     return;
   }
 
