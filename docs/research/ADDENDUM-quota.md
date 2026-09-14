@@ -187,7 +187,59 @@ generating one per loan is fine and reusing one across borrowers is a hard
 failure. And eligibility failing is not a soft condition to log past: it means
 the journey is unknown, and opening a ceremony anyway picks one at random.
 
-## 8 · Consequences for the architecture
+## 8 · A freshly onboarded identity cannot sign either
+
+Run 2026-09-13, and it settles §4. A second identity —
+`hello@lucerolabs.xyz`, which had no certificate — was onboarded end to end
+through `ONBOARDING_AND_SIGNING`: phone OTP, identity capture, live biometric
+validation, certificate issued, and a signing PIN set by the signer. Eligibility
+then reported `READY_FOR_SIGNING`.
+
+The signature failed anyway, with the same terminal screen as the exhausted
+account: *"No podemos completar la firma en este momento."* Session `open`,
+`errorCode: null`, no webhook.
+
+| | `scammi@gmail.com` | `hello@lucerolabs.xyz` |
+| --- | --- | --- |
+| Certificate | issued 2026-09-05 | issued minutes before signing |
+| Eligibility | `READY_FOR_SIGNING` | `READY_FOR_SIGNING` |
+| PIN | not recently set | **set by the signer, then used minutes later** |
+| Signature | fails | fails identically |
+
+Two things follow. The PIN hypothesis is dead: a key set and used within minutes
+cannot be misremembered. And a fresh identity does **not** arrive with usable
+signing capacity, which was the premise of the experiment — so the balance is
+not per signer in any way that helps, and §4's open question resolves against
+the per-signer reading.
+
+The residual uncertainty is what to call it. `SIGN_QUOTA_EXHAUSTED` was never
+observed directly; the browser reported `document_sign_failed` and quota is an
+inference from the portal. What is observed, and is enough to act on, is that
+**no identity in this integration can sign** — neither one holding a certificate
+for a week nor one created minutes ago.
+
+### Identity validation is live, and is not Veriff
+
+Preproduction does not stub it. The widget ran a real biometric check and
+rejected an attempt with *"Aseguraté de tener buena luz y que tu rostro este
+despejado"*, allowing three attempts. So *«usá usuarios y documentos sintéticos
+o autorizados»* resolves, for the identity step, to **autorizados**: a synthetic
+person does not onboard.
+
+The widget is branded **FID by Lakaut**. `sdk-integracion__flujos-identidad.md`
+names *«validación de identidad con Veriff»* at step 4 and never mentions FID.
+
+### The signer we onboarded has no portal login
+
+`web-preprod.lakautac.com.ar` asks for a password the SDK flow never set, so an
+identity onboarded through the SDK cannot reach the portal that shows its
+signature balance.
+
+Combined with §3 — no API reads a balance — this means an integrator has **no
+channel at all**, programmatic or human, to see or manage the signature capacity
+of a signer it onboarded itself.
+
+## 9 · Consequences for the architecture
 
 If §4 resolves to per-signer, capacity is metered per borrower in a product
 where every borrower signs, and the multi-tenancy note in AGENTS.md gains a
@@ -198,7 +250,7 @@ Either way, §3 stands on its own. A terminal error with no observable
 precondition and no programmatic remedy has to be handled as an operational
 event — which means it needs a webhook, an alert and a human, not a retry.
 
-## 9 · Questions for Lakaut
+## 10 · Questions for Lakaut
 
 1. Is there an API to read a signer's remaining signature balance?
 2. Can an integrator allocate or purchase signatures on a signer's behalf?
@@ -217,3 +269,9 @@ event — which means it needs a webhook, an alert and a human, not a retry.
    record that the signature failed.
 10. Reusing an `externalUserRef` with a second email returns a bare
     `INVALID_REQUEST`. Is the binding intentional, and can the error say so?
+11. A freshly onboarded identity cannot sign either. Is signing blocked at the
+    integration level rather than per signer?
+12. The identity widget is branded FID; the documentation says Veriff. Which is
+    current?
+13. An identity onboarded through the SDK has no portal password, so neither we
+    nor the signer can see their balance anywhere.
