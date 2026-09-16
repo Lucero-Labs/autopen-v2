@@ -67,6 +67,9 @@ importers:
         specifier: 0.1.0-rc.40
         version: 0.1.0-rc.40
     devDependencies:
+      '@types/node':
+        specifier: 22.18.1
+        version: 22.18.1
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
