@@ -36,17 +36,20 @@ RESULT-001 itself is never edited.
 ## Layout
 
 ```
-apps/                      deployable products (empty; see apps/README.md)
+apps/                      deployable products; see apps/README.md
 packages/core/             contracts + error classes + the signing spine. Zero dependencies.
 packages/gate/             PolicyGate engine, InMemoryPolicyRegistry, rule factories
 packages/rules-pagare-ar/  the Argentine pagaré rule set
 packages/adapter-lakaut/   the Lakaut provider. The only package importing @lakaut/*
+packages/tsconfig/         compiler settings every package extends; see its README
 docs/research/             RESULT-001 (architecture investigation) + ADDENDUM (what changed since)
 docs/design/               one design document per non-trivial change
 docs/vendor/lakaut/        21 mirrored Lakaut doc pages + llms.txt, pinned at SDK rc.40
 docs/product/              the current design prototype and a brief distilled from it
 docs/vendor/prototipo/     the 2026-08-16 prototype, superseded; cited by RESULT-001
 scripts/verify.sh          the one command that must pass on a laptop and in the cloud
+scripts/check-docs.mjs     the checkable half of STYLES §5
+lefthook.yml               git hooks: format on commit, check on push
 ```
 
 `apps/` vs `packages/` is **deployable vs importable**: an app has a process, a
@@ -66,10 +69,11 @@ Root scripts, each delegating to Turborepo (`turbo.json`):
 pnpm install --frozen-lockfile
 pnpm check       # biome: format + lint, report only
 pnpm check:fix   # biome: apply what it can fix
+pnpm check:docs  # exported declarations carry JSDoc; TODOs cite an issue
 pnpm build       # tsc per package → dist/
 pnpm typecheck   # tsc --noEmit over src/ and test/
 pnpm test        # vitest run, per package
-pnpm verify      # scripts/verify.sh: install + check + build + typecheck + test
+pnpm verify      # scripts/verify.sh: install + check + docs + build + typecheck + test
 ```
 
 Filter to one package: `pnpm test --filter=@autopen/gate`. Bypass the Turbo
@@ -86,18 +90,30 @@ Gotchas:
   inside `pnpm verify` before the build — it needs no `dist/` and finishes in
   milliseconds. It enforces the mechanical half of STYLES §1.2 plus the rules
   that are checkable: no `any`, no `!`, no default exports, `import type`,
-  kebab-case filenames. The rest of STYLES is still by hand and by review.
+  kebab-case filenames. `pnpm check:docs` adds the checkable half of §5. The
+  rest of STYLES is still by hand and by review.
+- `pnpm install` wires git hooks through lefthook (`lefthook.yml`): Biome
+  formats and re-stages staged files on commit, and `check:ci` plus
+  `check:docs` run on push. They are a convenience in front of CI, not a
+  replacement — `--no-verify` skips them and CI does not. `LEFTHOOK=0` skips
+  them once.
 - Node 22 (`.nvmrc`, `engines`) and pnpm 10.11.1 (`packageManager`, via
   Corepack) are pinned to the Claude Code cloud image. Do not bump them
   casually; `pnpm verify` green in both places is the compatibility check.
 
 ## TypeScript
 
-`tsconfig.base.json` is `strict` plus `noUncheckedIndexedAccess`,
+`packages/tsconfig/base.json` is `strict` plus `noUncheckedIndexedAccess`,
 `exactOptionalPropertyTypes`, `verbatimModuleSyntax` and `isolatedModules`, on
 ESM `NodeNext`. Three consequences you will hit immediately: relative imports
-carry `.ts`, rewritten to `.js` on emit; type imports must say `import type`; an optional property cannot be
-assigned `undefined` unless its type says `| undefined`. STYLES §2 and §4.
+carry `.ts`, rewritten to `.js` on emit; type imports must say `import type`; an
+optional property cannot be assigned `undefined` unless its type says
+`| undefined`. STYLES §2 and §4.
+
+A package's `tsconfig.json` is one line — `{ "extends":
+"@autopen/tsconfig/library.json" }` — and its `tsconfig.typecheck.json` extends
+`typecheck.json`. The shared files write paths as `${configDir}/…`, so they
+resolve against the package, not against `packages/tsconfig/`.
 
 ## The vendor
 
@@ -182,8 +198,12 @@ for that reason.
 
 ## Environment
 
-No code reads an environment variable yet. Two templates describe what will be
-read, and both are checked in because neither holds a value:
+Only apps read the environment, and each validates it once at import:
+`apps/signing-demo/src/env.ts` is the pattern (zod through `@t3-oss/env-core`),
+reporting a variable's name and never its value. Packages take configuration
+as arguments and never read `process.env` (`adapter-lakaut/src/client.ts`).
+Two templates describe what is read, and both are checked in because neither
+holds a value:
 
 - `.env.example` — the six `LAKAUT_*` variables, each with the constraint that
   makes it dangerous to get wrong. Copy to `.env`.

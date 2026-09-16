@@ -68,6 +68,7 @@ export type LakautSessions = Pick<
   "createSession" | "getSession" | "verifyAndAcknowledgeSignedArtifact"
 >;
 
+/** What `LakautSignatureProvider` needs beyond the port: a session client and an origin. */
 export interface LakautProviderOptions {
   readonly sessions: LakautSessions;
   /**
@@ -140,6 +141,12 @@ function toCeremonyState(status: SdkSessionStatus): CeremonyState {
   }
 }
 
+/**
+ * Runs ceremonies as Lakaut sessions, one signer and one document each.
+ *
+ * Construct it through `createLakautProvider` from an application; the
+ * constructor takes a `LakautSessions`, which only tests should build by hand.
+ */
 export class LakautSignatureProvider implements SignatureProvider {
   readonly #sessions: LakautSessions;
   readonly #allowedOrigin: string;

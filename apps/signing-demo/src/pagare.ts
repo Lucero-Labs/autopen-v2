@@ -14,6 +14,7 @@
 
 const ENCODER = new TextEncoder();
 
+/** The handful of fields the stand-in PDF prints. Not the rule set's `PagareDraft`. */
 export interface PagareDraft {
   /** The caller's own instrument identifier, printed and used as the seal reference. */
   readonly reference: string;

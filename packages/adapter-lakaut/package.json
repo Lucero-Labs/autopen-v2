@@ -31,7 +31,8 @@
     "@lakaut/shared-contracts": "0.1.0-rc.40"
   },
   "devDependencies": {
-    "@types/node": "22.18.1",
+    "@autopen/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -153,6 +153,10 @@ can find anything.
 - `TODO` only with an issue: `// TODO(#25): …`. A bare TODO is review-blocking.
 - Comments and JSDoc change in the same commit as the code they describe.
 
+`pnpm check:docs` enforces the forms a machine can be certain about: an exported
+declaration with no JSDoc, a summary that only re-spells the name, and a TODO
+with no issue. Whether a summary actually states the contract is still review.
+
 ## 6. Errors and fail-closed
 
 ### 6.1 Errors
@@ -364,7 +368,8 @@ verdict stays explicable after the rules change.
 
 Before opening or updating a PR:
 
-1. `pnpm verify` passes from the root — install, check, build, typecheck, test.
+1. `pnpm verify` passes from the root — install, check, docs, build, typecheck,
+   test.
 2. Every new export has a contract JSDoc; every new field is `readonly`; every
    returned object is frozen (§4, §5).
 3. No `any`, no `!`, no `Date.now()` in gated or hashed code, no money as a

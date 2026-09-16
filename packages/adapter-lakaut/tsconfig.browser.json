@@ -1,7 +1,6 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "@autopen/tsconfig/library.json",
   "compilerOptions": {
-    "rootDir": "src",
     "outDir": "dist-browser",
     "lib": ["ES2023", "DOM"]
   },

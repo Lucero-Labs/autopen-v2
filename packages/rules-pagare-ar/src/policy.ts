@@ -3,6 +3,12 @@ import { definePolicy, onlyWhen, predicate, required } from "@autopen/gate";
 
 import type { PagareDraft } from "./draft.ts";
 
+/**
+ * The key `pagareArPolicy` is registered and resolved under.
+ *
+ * Written into every stored verdict, so changing either field is a data
+ * migration (STYLES §3.1).
+ */
 export const PAGARE_AR_KEY: PolicyKey = Object.freeze({
   instrumentType: "pagare-con-garantia-prendaria",
   jurisdiction: "AR",

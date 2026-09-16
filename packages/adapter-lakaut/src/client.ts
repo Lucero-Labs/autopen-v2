@@ -115,6 +115,13 @@ const COMPATIBILITY: CompatibilityMetadata = Object.freeze({
   supportedSdkMajorVersions: Object.freeze([0]),
 });
 
+/**
+ * Everything needed to talk to one Lakaut integration in one environment.
+ *
+ * The four credential fields travel together and are never mixed across
+ * environments: an API key, integrator id, origin and base URL from
+ * preproduction are meaningless against production.
+ */
 export interface LakautClientOptions {
   readonly baseUrl: string;
   readonly integratorId: string;
