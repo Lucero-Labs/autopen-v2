@@ -23,6 +23,7 @@
     "@autopen/core": "workspace:*"
   },
   "devDependencies": {
+    "@autopen/tsconfig": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

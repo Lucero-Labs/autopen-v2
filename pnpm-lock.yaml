@@ -39,6 +39,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
     devDependencies:
+      '@autopen/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
       '@types/node':
         specifier: 22.18.1
         version: 22.18.1
@@ -67,6 +70,9 @@ importers:
         specifier: 0.1.0-rc.40
         version: 0.1.0-rc.40
     devDependencies:
+      '@autopen/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -76,6 +82,9 @@ importers:
 
   packages/core:
     devDependencies:
+      '@autopen/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -89,6 +98,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@autopen/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -105,12 +117,17 @@ importers:
         specifier: workspace:*
         version: link:../gate
     devDependencies:
+      '@autopen/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@types/node@22.18.1)(vite@8.2.2(@types/node@22.18.1)(esbuild@0.28.2))
+
+  packages/tsconfig: {}
 
 packages:
 

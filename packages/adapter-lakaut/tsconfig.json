@@ -1,6 +1,4 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "rootDir": "src", "outDir": "dist" },
-  "include": ["src/**/*"],
+  "extends": "@autopen/tsconfig/library.json",
   "exclude": ["src/renderer.ts"]
 }

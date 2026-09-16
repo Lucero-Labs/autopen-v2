@@ -41,6 +41,7 @@ packages/core/             contracts + error classes + the signing spine. Zero d
 packages/gate/             PolicyGate engine, InMemoryPolicyRegistry, rule factories
 packages/rules-pagare-ar/  the Argentine pagaré rule set
 packages/adapter-lakaut/   the Lakaut provider. The only package importing @lakaut/*
+packages/tsconfig/         compiler settings every package extends; see its README
 docs/research/             RESULT-001 (architecture investigation) + ADDENDUM (what changed since)
 docs/design/               one design document per non-trivial change
 docs/vendor/lakaut/        21 mirrored Lakaut doc pages + llms.txt, pinned at SDK rc.40
@@ -93,11 +94,17 @@ Gotchas:
 
 ## TypeScript
 
-`tsconfig.base.json` is `strict` plus `noUncheckedIndexedAccess`,
+`packages/tsconfig/base.json` is `strict` plus `noUncheckedIndexedAccess`,
 `exactOptionalPropertyTypes`, `verbatimModuleSyntax` and `isolatedModules`, on
 ESM `NodeNext`. Three consequences you will hit immediately: relative imports
-carry `.ts`, rewritten to `.js` on emit; type imports must say `import type`; an optional property cannot be
-assigned `undefined` unless its type says `| undefined`. STYLES §2 and §4.
+carry `.ts`, rewritten to `.js` on emit; type imports must say `import type`; an
+optional property cannot be assigned `undefined` unless its type says
+`| undefined`. STYLES §2 and §4.
+
+A package's `tsconfig.json` is one line — `{ "extends":
+"@autopen/tsconfig/library.json" }` — and its `tsconfig.typecheck.json` extends
+`typecheck.json`. The shared files write paths as `${configDir}/…`, so they
+resolve against the package, not against `packages/tsconfig/`.
 
 ## The vendor
 

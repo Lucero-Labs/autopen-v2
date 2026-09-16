@@ -24,6 +24,7 @@
     "@autopen/gate": "workspace:*"
   },
   "devDependencies": {
+    "@autopen/tsconfig": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
