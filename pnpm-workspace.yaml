@@ -14,6 +14,7 @@ autoInstallPeers: true
 # Single source for versions used by more than one package. Referenced as
 # `"typescript": "catalog:"`.
 catalog:
+  "@types/node": 22.18.1
   typescript: 5.9.3
   vitest: 4.1.11
 

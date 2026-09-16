@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    '@types/node':
+      specifier: 22.18.1
+      version: 22.18.1
     typescript:
       specifier: 5.9.3
       version: 5.9.3
@@ -52,7 +55,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/tsconfig
       '@types/node':
-        specifier: 22.18.1
+        specifier: 'catalog:'
         version: 22.18.1
       esbuild:
         specifier: 0.28.2
@@ -82,6 +85,9 @@ importers:
       '@autopen/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.18.1
       typescript:
         specifier: 'catalog:'
         version: 5.9.3

@@ -1,1 +1,4 @@
-{ "extends": "@autopen/tsconfig/library.json" }
+{
+  "extends": "@autopen/tsconfig/library.json",
+  "compilerOptions": { "types": ["node"] }
+}
