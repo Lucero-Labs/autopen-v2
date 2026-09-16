@@ -40,11 +40,27 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      # `.npmrc` is gitignored, so without this the @lakaut scope resolves
+      # against the public registry and install fails with a 404 for a package
+      # that exists. The template carries no credential: it reads
+      # LAKAUT_NPM_AUTH from the environment at install time.
+      - name: Route @lakaut to its registry
+        run: cp .npmrc.example .npmrc
+
       # Separated from `verify` so lockfile drift — the failure that breaks a
       # cloud session at startup — fails under a step name that says what broke.
       # verify.sh installs again; the second run is a no-op.
+      #
+      # The Nexus credential is read-only and install-time only (AGENTS.md
+      # "Environment"). It is scoped to the two steps that run pnpm install,
+      # not the job, so no third-party action receives it. The API key is
+      # never here: unit tests make no live call (STYLES §10).
       - name: Install
         run: pnpm install --frozen-lockfile
+        env:
+          LAKAUT_NPM_AUTH: ${{ secrets.LAKAUT_NPM_AUTH }}
 
       - name: Verify
         run: pnpm verify
+        env:
+          LAKAUT_NPM_AUTH: ${{ secrets.LAKAUT_NPM_AUTH }}
