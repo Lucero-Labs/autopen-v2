@@ -1,5 +1,5 @@
-export { definePolicy, InMemoryPolicyRegistry } from "./registry.js";
-export { PolicyGate, systemClock, type Clock, type PolicyGateOptions } from "./policy-gate.js";
+export { definePolicy, InMemoryPolicyRegistry } from "./registry.ts";
+export { PolicyGate, systemClock, type Clock, type PolicyGateOptions } from "./policy-gate.ts";
 export {
   rule,
   predicate,
@@ -8,4 +8,4 @@ export {
   withSeverity,
   satisfied,
   unsatisfied,
-} from "./rules.js";
+} from "./rules.ts";

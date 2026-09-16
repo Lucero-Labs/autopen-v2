@@ -10,7 +10,39 @@ export type {
   Finding,
   GateVerdict,
   Gate,
-} from "./contracts.js";
+} from "./contracts.ts";
+
+export type {
+  DocumentId,
+  CeremonyId,
+  ContentHash,
+  Clock,
+  SealedDocument,
+  SignerIdentity,
+  SignerRole,
+  CeremonyJourney,
+  AuthenticationFactors,
+  CeremonyPlan,
+  CeremonyHandoff,
+  Ceremony,
+  CeremonyDisposition,
+  CeremonyState,
+  CeremonyStatus,
+  SignatureAttestation,
+  VerifiedArtifact,
+  SignedDelivery,
+  CustodySink,
+  SignatureProvider,
+  DocumentStore,
+  CeremonyLedger,
+  SigningCore,
+} from "./signing.ts";
+
+export { sha256, deriveDocumentId, seal } from "./seal.ts";
+
+export { DefaultSigningCore, type SigningCoreOptions } from "./signing-core.ts";
+
+export { InMemoryDocumentStore, InMemoryCeremonyLedger } from "./stores.ts";
 
 export {
   CoreError,
@@ -18,4 +50,9 @@ export {
   DuplicatePolicyError,
   DuplicateRuleIdError,
   RuleEvaluationError,
-} from "./errors.js";
+  SealConflictError,
+  HashUnavailableError,
+  CeremonyNotFoundError,
+  DocumentNotSealedError,
+  CustodyFailedError,
+} from "./errors.ts";

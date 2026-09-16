@@ -22,9 +22,10 @@ The first document is an Argentine *pagaré*; its rule set is
 ## What exists
 
 ```
-packages/core/             contracts + error classes. Zero dependencies.
+packages/core/             contracts, error classes, and the signing spine. Zero dependencies.
 packages/gate/             PolicyGate engine, InMemoryPolicyRegistry, rule factories
 packages/rules-pagare-ar/  the Argentine pagaré rule set
+packages/adapter-lakaut/   the Lakaut provider, behind the SignatureProvider port
 apps/                      deployable products (empty so far — see apps/README.md)
 ```
 
@@ -32,10 +33,12 @@ apps/                      deployable products (empty so far — see apps/README
 knowing nothing about what it is gating. `@autopen/rules-pagare-ar` is the first
 policy registered with it; `packages/gate/README.md` shows how to compose one.
 
-The Lakaut adapter, the seal operation, ingest and the evidence bundle are not
-built yet; `docs/design/` holds the designs that exist, and the open GitHub
-issues are the plan. Preproduction access is live — see AGENTS.md, "Vendor
-access", including why it is not a scratch environment.
+The spine is `seal → openCeremony → ingest → reconcile`, with
+`@autopen/adapter-lakaut` implementing the provider port against the SDK at
+exact `0.1.0-rc.40`. `docs/design/signing-spine.md` explains what the SDK's own
+types changed about it. Rendering, the liquidación and the evidence bundle are
+not built. Preproduction access is live — see AGENTS.md, "Vendor access",
+including why it is not a scratch environment.
 
 ## Running it
 

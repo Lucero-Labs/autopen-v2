@@ -106,6 +106,12 @@ export interface GateVerdict {
 /** Per-call overrides; the engine supplies defaults for anything omitted. */
 export type RuleContextOverrides = Partial<RuleContext>;
 
+/**
+ * Decides whether a subject may proceed to an irreversible step.
+ *
+ * Resolves a verdict for every registered policy key and throws for an
+ * unregistered one; "no rules configured" is never a pass (STYLES §6.2).
+ */
 export interface Gate<TSubject> {
   evaluate(
     subject: TSubject,

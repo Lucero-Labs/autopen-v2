@@ -1,5 +1,1 @@
-{
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "noEmit": true },
-  "include": ["src/**/*", "test/**/*"]
-}
+{ "extends": "@autopen/tsconfig/typecheck.json" }

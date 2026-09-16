@@ -5,6 +5,8 @@
       "**/*.ts",
       "**/*.json",
       "!**/dist",
+      "!**/dist-browser",
+      "!**/web/client.js",
       "!**/node_modules",
       "!**/.turbo",
       "!pnpm-lock.yaml"
@@ -34,7 +36,9 @@
         "useImportType": "error",
         "useFilenamingConvention": {
           "level": "error",
-          "options": { "filenameCases": ["kebab-case"] }
+          "options": {
+            "filenameCases": ["kebab-case"]
+          }
         }
       },
       "suspicious": {

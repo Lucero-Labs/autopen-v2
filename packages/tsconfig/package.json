@@ -1,0 +1,11 @@
+{
+  "name": "@autopen/tsconfig",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    "./*.json": "./*.json"
+  },
+  "files": [
+    "*.json"
+  ]
+}

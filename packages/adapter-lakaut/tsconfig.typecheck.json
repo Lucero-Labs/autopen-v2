@@ -1,0 +1,5 @@
+{
+  "extends": "@autopen/tsconfig/typecheck.json",
+  "compilerOptions": { "types": ["node"] },
+  "exclude": ["src/renderer.ts"]
+}

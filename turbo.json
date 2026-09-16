@@ -1,12 +1,12 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "stream",
-  "globalDependencies": ["tsconfig.base.json", ".nvmrc"],
+  "globalDependencies": ["packages/tsconfig/*.json", ".nvmrc"],
   "globalPassThroughEnv": ["CI"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**", "dist-browser/**", "web/client.js"]
     },
     "typecheck": {
       "dependsOn": ["^build"],

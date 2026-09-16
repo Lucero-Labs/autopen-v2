@@ -1,0 +1,27 @@
+# Git hooks, installed by lefthook's postinstall on `pnpm install`.
+#
+# They are a convenience in front of CI, never a substitute for it: `git commit
+# --no-verify` skips them, and `pnpm verify` in CI is still the gate. Each one
+# is chosen to finish in well under a second, because a slow hook is one people
+# learn to bypass.
+#
+# Skip once with LEFTHOOK=0 git push.
+
+pre-commit:
+  jobs:
+    # Formats and applies safe lint fixes to what is being committed, then
+    # re-stages it, so a commit never lands unformatted. Unfixable findings
+    # fail the commit here instead of in CI ten minutes later.
+    - name: biome
+      glob: "*.{ts,json}"
+      run: pnpm exec biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true
+
+pre-push:
+  jobs:
+    # Whole-repo rather than the pushed files: both finish in milliseconds, so
+    # narrowing them saves nothing and adds a way to miss something.
+    - name: biome
+      run: pnpm run check:ci
+    - name: docs
+      run: pnpm run check:docs
