@@ -82,6 +82,7 @@ function toCeremonyEvent(event: BrowserLifecycleEvent): CeremonyEvent {
   });
 }
 
+/** Where to mount a ceremony, what it signs, and who hears about it. */
 export interface MountCeremonyOptions {
   /**
    * The handoff a backend produced, passed through untouched.

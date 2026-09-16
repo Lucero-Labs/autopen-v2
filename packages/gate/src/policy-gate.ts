@@ -17,8 +17,10 @@ export interface Clock {
   now(): Date;
 }
 
+/** Reads the wall clock. The default when `PolicyGateOptions.clock` is omitted. */
 export const systemClock: Clock = { now: () => new Date() };
 
+/** Optional overrides for a `PolicyGate`; both have production defaults. */
 export interface PolicyGateOptions {
   readonly clock?: Clock;
   readonly defaultLocale?: string;

@@ -3,8 +3,15 @@ import type { Rule, RuleContext, RuleOutcome, Severity } from "@autopen/core";
 /** A rule is satisfied. Shared frozen value — the outcome carries no data. */
 const SATISFIED: RuleOutcome = Object.freeze({ satisfied: true as const });
 
+/** Reports that the subject meets the rule. */
 export const satisfied = (): RuleOutcome => SATISFIED;
 
+/**
+ * Reports that the subject fails the rule, optionally saying why and where.
+ *
+ * `message` overrides the rule's description; `path` points a form at the
+ * offending field.
+ */
 export const unsatisfied = (input?: {
   message?: string;
   path?: string;

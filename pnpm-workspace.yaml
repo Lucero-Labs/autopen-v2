@@ -16,3 +16,9 @@ autoInstallPeers: true
 catalog:
   typescript: 5.9.3
   vitest: 4.1.11
+
+# pnpm 10 runs no dependency lifecycle script unless it is listed here.
+# lefthook's postinstall runs `lefthook install`, wiring lefthook.yml into
+# .git/hooks; it skips itself when CI=true, so CI gains no hooks from it.
+onlyBuiltDependencies:
+  - lefthook

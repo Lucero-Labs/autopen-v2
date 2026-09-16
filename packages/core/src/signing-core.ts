@@ -27,6 +27,7 @@ import type {
   VerifiedArtifact,
 } from "./signing.ts";
 
+/** The ports and provider facts `DefaultSigningCore` is built from. */
 export interface SigningCoreOptions {
   readonly provider: SignatureProvider;
   readonly documents: DocumentStore;
@@ -39,6 +40,12 @@ export interface SigningCoreOptions {
   readonly maxDocumentBytes: number;
 }
 
+/**
+ * `SigningCore` over injected ports, adding no behaviour but refusal.
+ *
+ * Every operation that cannot find what it depends on — an unsealed document,
+ * an unrecorded ceremony — throws before the provider is called.
+ */
 export class DefaultSigningCore implements SigningCore {
   readonly #provider: SignatureProvider;
   readonly #documents: DocumentStore;

@@ -111,6 +111,13 @@ export interface CeremonyHandoff {
   readonly context: Readonly<Record<string, unknown>>;
 }
 
+/**
+ * An opened ceremony: which document, and the handoff that starts it in a browser.
+ *
+ * `SigningCore.openCeremony` records it in the ledger before returning it, so a
+ * webhook that arrives for it can always be routed. `openedAt` is when we asked, not when the signer
+ * arrived.
+ */
 export interface Ceremony {
   readonly ceremonyId: CeremonyId;
   readonly documentId: DocumentId;
@@ -147,6 +154,13 @@ export interface CeremonyStatus {
   readonly observedAt: string;
 }
 
+/**
+ * One signature found in verified bytes, as the provider's evidence describes it.
+ *
+ * It identifies a certificate, not a person: RENAPER identity is established
+ * only transitively, through the certificate's issuance (RESULT-001 §3.8).
+ * `certificateRef` is empty when the evidence shape does not carry one.
+ */
 export interface SignatureAttestation {
   readonly signerCertificateFingerprint: string;
   readonly certificateRef: string;

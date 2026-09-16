@@ -48,6 +48,8 @@ docs/vendor/lakaut/        21 mirrored Lakaut doc pages + llms.txt, pinned at SD
 docs/product/              the current design prototype and a brief distilled from it
 docs/vendor/prototipo/     the 2026-08-16 prototype, superseded; cited by RESULT-001
 scripts/verify.sh          the one command that must pass on a laptop and in the cloud
+scripts/check-docs.mjs     the checkable half of STYLES §5
+lefthook.yml               git hooks: format on commit, check on push
 ```
 
 `apps/` vs `packages/` is **deployable vs importable**: an app has a process, a
@@ -67,10 +69,11 @@ Root scripts, each delegating to Turborepo (`turbo.json`):
 pnpm install --frozen-lockfile
 pnpm check       # biome: format + lint, report only
 pnpm check:fix   # biome: apply what it can fix
+pnpm check:docs  # exported declarations carry JSDoc; TODOs cite an issue
 pnpm build       # tsc per package → dist/
 pnpm typecheck   # tsc --noEmit over src/ and test/
 pnpm test        # vitest run, per package
-pnpm verify      # scripts/verify.sh: install + check + build + typecheck + test
+pnpm verify      # scripts/verify.sh: install + check + docs + build + typecheck + test
 ```
 
 Filter to one package: `pnpm test --filter=@autopen/gate`. Bypass the Turbo
@@ -87,7 +90,13 @@ Gotchas:
   inside `pnpm verify` before the build — it needs no `dist/` and finishes in
   milliseconds. It enforces the mechanical half of STYLES §1.2 plus the rules
   that are checkable: no `any`, no `!`, no default exports, `import type`,
-  kebab-case filenames. The rest of STYLES is still by hand and by review.
+  kebab-case filenames. `pnpm check:docs` adds the checkable half of §5. The
+  rest of STYLES is still by hand and by review.
+- `pnpm install` wires git hooks through lefthook (`lefthook.yml`): Biome
+  formats and re-stages staged files on commit, and `check:ci` plus
+  `check:docs` run on push. They are a convenience in front of CI, not a
+  replacement — `--no-verify` skips them and CI does not. `LEFTHOOK=0` skips
+  them once.
 - Node 22 (`.nvmrc`, `engines`) and pnpm 10.11.1 (`packageManager`, via
   Corepack) are pinned to the Claude Code cloud image. Do not bump them
   casually; `pnpm verify` green in both places is the compatibility check.
