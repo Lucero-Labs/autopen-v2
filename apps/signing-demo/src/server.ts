@@ -38,60 +38,16 @@ import {
   createLakautProvider,
   isWebhookChallenge,
   LAKAUT_MAX_DOCUMENT_BYTES,
-  type LakautEnvironment,
   readCeremonyNotification,
   type WebhookChallengeReply,
 } from "@autopen/adapter-lakaut";
 
+import { env } from "./env.ts";
 import { renderPagare } from "./pagare.ts";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const WEB = join(HERE, "..", "web");
 const EVIDENCE = join(HERE, "..", "evidence");
-
-/**
- * Reads one variable or refuses to start.
- *
- * Fail closed at boot rather than at the first ceremony: a missing origin
- * surfaces as `FORBIDDEN_ORIGIN` three steps later, which reads like a
- * dashboard problem (STYLES §0.1).
- */
-function required(name: string): string {
-  const value = process.env[name];
-  if (value === undefined || value === "") {
-    throw new Error(`${name} is unset. Copy .env.example to .env and fill it in.`);
-  }
-  return value;
-}
-
-/**
- * Refuses to start against an origin the Hosted UI cannot be framed by.
- *
- * `createSession` accepts whatever origin it is handed and validates it against
- * the dashboard, so a wrong value here does not fail until the iframe declines
- * to load — and the browser reports that as a bare "refused to connect". An
- * http origin never works: the ceremony needs camera access, which browsers
- * grant only over https (`sdk-integracion__frontend-hosted-ui.md`).
- */
-function toOrigin(value: string): string {
-  if (!value.startsWith("https://")) {
-    throw new Error(
-      `LAKAUT_ALLOWED_ORIGIN is "${value}". The Hosted UI needs an https origin ` +
-        "declared in the dashboard — point it at your tunnel, not at localhost.",
-    );
-  }
-  return value;
-}
-
-const ORIGIN = toOrigin(required("LAKAUT_ALLOWED_ORIGIN"));
-
-/** Narrows the configured environment rather than trusting the string (§0.1). */
-function toEnvironment(value: string): LakautEnvironment {
-  if (value !== "local" && value !== "sandbox" && value !== "production") {
-    throw new Error(`LAKAUT_ENVIRONMENT is "${value}"; expected local, sandbox or production`);
-  }
-  return value;
-}
 
 /**
  * Blank until a destination is saved in the dashboard, which is correct.
@@ -100,16 +56,16 @@ function toEnvironment(value: string): LakautEnvironment {
  * value that can change under a running verifier is how a rotation silently
  * half-applies.
  */
-const WEBHOOK_SECRET = process.env["LAKAUT_WEBHOOK_SECRET"] ?? "";
+const WEBHOOK_SECRET = env.LAKAUT_WEBHOOK_SECRET;
 
 const ceremonies = new InMemoryCeremonyLedger();
 
 const LAKAUT = {
-  baseUrl: required("LAKAUT_AUTH_BASE_URL"),
-  integratorId: required("LAKAUT_INTEGRATOR_ID"),
-  apiKey: required("LAKAUT_API_KEY"),
-  environment: toEnvironment(required("LAKAUT_ENVIRONMENT")),
-  allowedOrigin: ORIGIN,
+  baseUrl: env.LAKAUT_AUTH_BASE_URL,
+  integratorId: env.LAKAUT_INTEGRATOR_ID,
+  apiKey: env.LAKAUT_API_KEY,
+  environment: env.LAKAUT_ENVIRONMENT,
+  allowedOrigin: env.LAKAUT_ALLOWED_ORIGIN,
   now: () => new Date(),
 } as const;
 
@@ -337,7 +293,7 @@ async function handleWebhook(
   response: ServerResponse,
   raw: Buffer,
 ): Promise<void> {
-  if (WEBHOOK_SECRET === "") {
+  if (WEBHOOK_SECRET === undefined) {
     // Fail closed: an unverifiable delivery is never acknowledged (§0.1).
     console.error("webhook rejected: LAKAUT_WEBHOOK_SECRET is unset");
     response.writeHead(503).end("webhook secret not configured");
@@ -481,5 +437,5 @@ createServer((request, response) => {
     if (!response.headersSent) json(response, 500, { error: message });
   });
 }).listen(3000, () => {
-  console.log(`listening on http://localhost:3000  declared origin ${ORIGIN}`);
+  console.log(`listening on http://localhost:3000  declared origin ${env.LAKAUT_ALLOWED_ORIGIN}`);
 });

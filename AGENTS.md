@@ -36,7 +36,7 @@ RESULT-001 itself is never edited.
 ## Layout
 
 ```
-apps/                      deployable products (empty; see apps/README.md)
+apps/                      deployable products; see apps/README.md
 packages/core/             contracts + error classes + the signing spine. Zero dependencies.
 packages/gate/             PolicyGate engine, InMemoryPolicyRegistry, rule factories
 packages/rules-pagare-ar/  the Argentine pagaré rule set
@@ -198,8 +198,12 @@ for that reason.
 
 ## Environment
 
-No code reads an environment variable yet. Two templates describe what will be
-read, and both are checked in because neither holds a value:
+Only apps read the environment, and each validates it once at import:
+`apps/signing-demo/src/env.ts` is the pattern (zod through `@t3-oss/env-core`),
+reporting a variable's name and never its value. Packages take configuration
+as arguments and never read `process.env` (`adapter-lakaut/src/client.ts`).
+Two templates describe what is read, and both are checked in because neither
+holds a value:
 
 - `.env.example` — the six `LAKAUT_*` variables, each with the constraint that
   makes it dangerous to get wrong. Copy to `.env`.

@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@autopen/adapter-lakaut": "workspace:*",
-    "@autopen/core": "workspace:*"
+    "@autopen/core": "workspace:*",
+    "@t3-oss/env-core": "0.13.11",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@autopen/tsconfig": "workspace:*",
