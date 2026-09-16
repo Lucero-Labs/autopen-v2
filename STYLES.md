@@ -68,8 +68,10 @@ When two approaches both work, these decide. They override personal preference.
 
 ## 2. Imports and modules
 
-- ESM under `NodeNext`: relative imports carry `.js` (`from "./contracts.js"`)
-  even though the file on disk is `.ts`.
+- ESM under `NodeNext`: relative imports name the real file, extension
+  included (`from "./contracts.ts"`). `rewriteRelativeImportExtensions` turns
+  them into `.js` in emitted JavaScript. An extensionless path is a compile
+  error, because Node's ESM loader would not resolve it either.
 - `verbatimModuleSyntax` is on: `import type { … }`, or an inline `type`
   modifier when a statement mixes values and types (`policy-gate.ts` does).
 - Cross-package imports use the package name (`from "@autopen/core"`), never a

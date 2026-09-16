@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { HashUnavailableError, SealConflictError } from "../src/errors.js";
-import { deriveDocumentId, seal, sha256 } from "../src/seal.js";
-import type { Clock, ContentHash, SealedDocument } from "../src/signing.js";
-import { InMemoryDocumentStore } from "../src/stores.js";
+import { HashUnavailableError, SealConflictError } from "../src/errors.ts";
+import { deriveDocumentId, seal, sha256 } from "../src/seal.ts";
+import type { Clock, ContentHash, SealedDocument } from "../src/signing.ts";
+import { InMemoryDocumentStore } from "../src/stores.ts";
 
 const AT = new Date("2026-09-11T12:00:00.000Z");
 const clock: Clock = () => AT;

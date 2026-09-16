@@ -15,7 +15,7 @@ import type {
   DocumentId,
   DocumentStore,
   SealedDocument,
-} from "./signing.js";
+} from "./signing.ts";
 
 /** Documents held in a Map, keyed by `documentId`. */
 export class InMemoryDocumentStore implements DocumentStore {

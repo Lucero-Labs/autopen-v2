@@ -43,7 +43,7 @@ import {
   type WebhookChallengeReply,
 } from "@autopen/adapter-lakaut";
 
-import { renderPagare } from "./pagare.js";
+import { renderPagare } from "./pagare.ts";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const WEB = join(HERE, "..", "web");

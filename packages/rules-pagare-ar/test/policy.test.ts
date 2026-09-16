@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryPolicyRegistry, PolicyGate } from "@autopen/gate";
 
-import { PAGARE_AR_KEY, pagareArPolicy } from "../src/policy.js";
-import type { PagareDraft } from "../src/draft.js";
+import { PAGARE_AR_KEY, pagareArPolicy } from "../src/policy.ts";
+import type { PagareDraft } from "../src/draft.ts";
 
 const gate = new PolicyGate<PagareDraft>(
   new InMemoryPolicyRegistry<PagareDraft>().register(PAGARE_AR_KEY, pagareArPolicy),

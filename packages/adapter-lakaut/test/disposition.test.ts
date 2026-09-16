@@ -2,7 +2,7 @@ import type { CeremonyDisposition } from "@autopen/core";
 import { categoryFor } from "@lakaut/shared-contracts";
 import { describe, expect, it } from "vitest";
 
-import { dispositionForFailure } from "../src/disposition.js";
+import { dispositionForFailure } from "../src/disposition.ts";
 
 describe("dispositionForFailure", () => {
   it("treats a failure the provider marked unretryable as terminal", () => {

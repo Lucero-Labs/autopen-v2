@@ -1,7 +1,7 @@
 import type { Policy, PolicyKey, Rule } from "@autopen/core";
 import { definePolicy, onlyWhen, predicate, required } from "@autopen/gate";
 
-import type { PagareDraft } from "./draft.js";
+import type { PagareDraft } from "./draft.ts";
 
 export const PAGARE_AR_KEY: PolicyKey = Object.freeze({
   instrumentType: "pagare-con-garantia-prendaria",

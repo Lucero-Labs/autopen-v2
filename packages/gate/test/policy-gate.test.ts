@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { PolicyNotFoundError, RuleEvaluationError, type Rule } from "@autopen/core";
 
-import { definePolicy, InMemoryPolicyRegistry } from "../src/registry.js";
-import { PolicyGate, type Clock } from "../src/policy-gate.js";
-import { onlyWhen, predicate, required, rule, satisfied, withSeverity } from "../src/rules.js";
+import { definePolicy, InMemoryPolicyRegistry } from "../src/registry.ts";
+import { PolicyGate, type Clock } from "../src/policy-gate.ts";
+import { onlyWhen, predicate, required, rule, satisfied, withSeverity } from "../src/rules.ts";
 
 interface Subject {
   readonly name?: string | undefined;

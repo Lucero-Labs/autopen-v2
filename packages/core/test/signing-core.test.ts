@@ -4,8 +4,8 @@ import {
   CeremonyNotFoundError,
   CustodyFailedError,
   DocumentNotSealedError,
-} from "../src/errors.js";
-import { DefaultSigningCore } from "../src/signing-core.js";
+} from "../src/errors.ts";
+import { DefaultSigningCore } from "../src/signing-core.ts";
 import type {
   Ceremony,
   CeremonyId,
@@ -20,8 +20,8 @@ import type {
   SignedDelivery,
   SignerRole,
   VerifiedArtifact,
-} from "../src/signing.js";
-import { InMemoryCeremonyLedger, InMemoryDocumentStore } from "../src/stores.js";
+} from "../src/signing.ts";
+import { InMemoryCeremonyLedger, InMemoryDocumentStore } from "../src/stores.ts";
 
 const AT = new Date("2026-09-11T12:00:00.000Z");
 const now: Clock = () => AT;

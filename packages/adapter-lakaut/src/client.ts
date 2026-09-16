@@ -16,7 +16,7 @@ import type { CeremonyJourney, Clock } from "@autopen/core";
 import { HttpAuthTransport, SessionClient } from "@lakaut/server";
 import type { CompatibilityMetadata } from "@lakaut/shared-contracts";
 
-import { LakautSignatureProvider } from "./provider.js";
+import { LakautSignatureProvider } from "./provider.ts";
 
 /**
  * Lakaut's three environments, restated so callers need not import the vendor.

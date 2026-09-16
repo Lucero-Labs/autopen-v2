@@ -19,7 +19,7 @@ import {
 } from "@lakaut/shared-contracts";
 import { describe, expect, it } from "vitest";
 
-import { type LakautSessions, LakautSignatureProvider } from "../src/provider.js";
+import { type LakautSessions, LakautSignatureProvider } from "../src/provider.ts";
 
 const AT = new Date("2026-09-11T12:00:00.000Z");
 const now: Clock = () => AT;

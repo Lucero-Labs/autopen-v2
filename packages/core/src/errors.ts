@@ -1,4 +1,4 @@
-import type { PolicyKey } from "./contracts.js";
+import type { PolicyKey } from "./contracts.ts";
 
 /** Base class so callers can catch everything this domain throws. */
 export class CoreError extends Error {

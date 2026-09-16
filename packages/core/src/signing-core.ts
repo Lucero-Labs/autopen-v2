@@ -7,8 +7,8 @@
  * rather than proceeding on an assumption.
  */
 
-import { CeremonyNotFoundError, CustodyFailedError, DocumentNotSealedError } from "./errors.js";
-import { seal } from "./seal.js";
+import { CeremonyNotFoundError, CustodyFailedError, DocumentNotSealedError } from "./errors.ts";
+import { seal } from "./seal.ts";
 import type {
   Ceremony,
   CeremonyId,
@@ -25,7 +25,7 @@ import type {
   SignerRole,
   SigningCore,
   VerifiedArtifact,
-} from "./signing.js";
+} from "./signing.ts";
 
 export interface SigningCoreOptions {
   readonly provider: SignatureProvider;

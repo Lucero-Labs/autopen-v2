@@ -10,7 +10,7 @@ export type {
   Finding,
   GateVerdict,
   Gate,
-} from "./contracts.js";
+} from "./contracts.ts";
 
 export type {
   DocumentId,
@@ -36,13 +36,13 @@ export type {
   DocumentStore,
   CeremonyLedger,
   SigningCore,
-} from "./signing.js";
+} from "./signing.ts";
 
-export { sha256, deriveDocumentId, seal } from "./seal.js";
+export { sha256, deriveDocumentId, seal } from "./seal.ts";
 
-export { DefaultSigningCore, type SigningCoreOptions } from "./signing-core.js";
+export { DefaultSigningCore, type SigningCoreOptions } from "./signing-core.ts";
 
-export { InMemoryDocumentStore, InMemoryCeremonyLedger } from "./stores.js";
+export { InMemoryDocumentStore, InMemoryCeremonyLedger } from "./stores.ts";
 
 export {
   CoreError,
@@ -55,4 +55,4 @@ export {
   CeremonyNotFoundError,
   DocumentNotSealedError,
   CustodyFailedError,
-} from "./errors.js";
+} from "./errors.ts";

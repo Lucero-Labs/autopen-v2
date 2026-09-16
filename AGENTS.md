@@ -96,7 +96,7 @@ Gotchas:
 `tsconfig.base.json` is `strict` plus `noUncheckedIndexedAccess`,
 `exactOptionalPropertyTypes`, `verbatimModuleSyntax` and `isolatedModules`, on
 ESM `NodeNext`. Three consequences you will hit immediately: relative imports
-carry `.js`; type imports must say `import type`; an optional property cannot be
+carry `.ts`, rewritten to `.js` on emit; type imports must say `import type`; an optional property cannot be
 assigned `undefined` unless its type says `| undefined`. STYLES §2 and §4.
 
 ## The vendor

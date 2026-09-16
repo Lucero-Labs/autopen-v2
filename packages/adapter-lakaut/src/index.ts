@@ -3,7 +3,7 @@ export {
   LAKAUT_MAX_DOCUMENT_BYTES,
   type LakautProviderOptions,
   type LakautSessions,
-} from "./provider.js";
+} from "./provider.ts";
 
 export {
   checkSigningEligibility,
@@ -11,9 +11,9 @@ export {
   type LakautClientOptions,
   type LakautEnvironment,
   type SigningEligibility,
-} from "./client.js";
+} from "./client.ts";
 
-export { dispositionForFailure, type FailureSignal } from "./disposition.js";
+export { dispositionForFailure, type FailureSignal } from "./disposition.ts";
 
 export {
   answerWebhookChallenge,
@@ -22,4 +22,4 @@ export {
   type CeremonyNotification,
   type WebhookChallengeReply,
   type WebhookHeaders,
-} from "./webhooks.js";
+} from "./webhooks.ts";

@@ -21,8 +21,8 @@
  * dependencies and stays runtime-agnostic (STYLES §1.1, §10).
  */
 
-import { HashUnavailableError, SealConflictError } from "./errors.js";
-import type { Clock, ContentHash, DocumentId, DocumentStore, SealedDocument } from "./signing.js";
+import { HashUnavailableError, SealConflictError } from "./errors.ts";
+import type { Clock, ContentHash, DocumentId, DocumentStore, SealedDocument } from "./signing.ts";
 
 interface SubtleCryptoLike {
   digest(algorithm: "SHA-256", data: Uint8Array): Promise<ArrayBuffer>;

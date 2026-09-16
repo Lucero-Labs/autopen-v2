@@ -14,7 +14,7 @@ import {
   isWebhookChallenge,
   readCeremonyNotification,
   type WebhookHeaders,
-} from "../src/webhooks.js";
+} from "../src/webhooks.ts";
 
 const SECRET = "whsec_fixture_only_never_a_real_secret";
 const OTHER_SECRET = "whsec_the_one_being_rotated_out";

@@ -35,7 +35,7 @@ import type {
   SignedDocumentArtifact,
 } from "@lakaut/browser";
 
-import { dispositionForFailure } from "./disposition.js";
+import { dispositionForFailure } from "./disposition.ts";
 
 /** What a mounted ceremony offers its host: the ability to take it down. */
 export interface MountedCeremony {
