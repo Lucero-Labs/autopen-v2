@@ -89,6 +89,14 @@ not exist.
 The experiment that settles it is onboarding a **second, different identity**
 and observing whether it arrives with its own two firmas.
 
+**Resolved by the vendor, 2026-09-14.** Lakaut replied that *"el problema
+radica en la asignación de firmas a la integración para que puedan ser
+consumidas"*, and that an infrastructure migration is delaying the fix. The
+balance that blocked both identities is allocated to the integration, not to
+each signer. Still unanswered: whether an integration balance is also what a
+production signer draws on, whether a failed attempt consumes a credit, and
+whether any API will expose it (§10).
+
 ## 5 · The service emits a code the SDK does not declare
 
 A third ceremony, run once the balance was already zero, ended with:
