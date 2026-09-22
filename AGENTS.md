@@ -42,7 +42,7 @@ packages/gate/             PolicyGate engine, InMemoryPolicyRegistry, rule facto
 packages/rules-pagare-ar/  the Argentine pagaré rule set
 packages/adapter-lakaut/   the Lakaut provider. The only package importing @lakaut/*
 packages/tsconfig/         compiler settings every package extends; see its README
-docs/research/             RESULT-001 (architecture investigation) + ADDENDUM (what changed since)
+docs/research/             RESULT-001 (architecture investigation) + dated addenda (what changed since)
 docs/design/               one design document per non-trivial change
 docs/vendor/lakaut/        21 mirrored Lakaut doc pages + llms.txt, pinned at SDK rc.40
 docs/product/              the current design prototype and a brief distilled from it
