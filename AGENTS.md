@@ -117,10 +117,10 @@ resolve against the package, not against `packages/tsconfig/`.
 
 ## The vendor
 
-Lakaut's SDK is `@lakaut/server` + `@lakaut/browser` at exact `0.1.0-rc.40`.
-Neither is installed yet; installing needs `LAKAUT_NPM_AUTH` in a gitignored
-`.npmrc`. `docs/vendor/lakaut/` is a faithful mirror of the vendor docs at rc.40
-and is the citation source for every vendor claim — quote it, do not paraphrase
+Lakaut's SDK is `@lakaut/server` + `@lakaut/browser` at exact `0.1.0-rc.40`,
+installed by `packages/adapter-lakaut` alone; installing needs `LAKAUT_NPM_AUTH`
+in a gitignored `.npmrc`. `docs/vendor/lakaut/` is a faithful mirror of the
+vendor docs at rc.40 and is the citation source for every vendor claim — quote it, do not paraphrase
 from memory. The vendor's seven non-negotiable rules
 (`sdk-integracion__agentes.md`) are restated with their consequences in STYLES
 §8–§9.
@@ -137,26 +137,25 @@ This unblocks the 18-item verification list in RESULT-001 §6 and the adapter.
 The multi-party signature question that used to gate several of them was settled
 affirmatively by rc.40 (`ADDENDUM` §1) and is no longer open.
 
-**Preproduction is not a scratch environment.** A Lakaut account is one per DNI,
-the signing PIN is per-signature with no documented reset, and
-`SIGN_PIN_RATE_LIMITED` is a real code. A test identity whose PIN locks may not
-be replaceable by the same person.
+**Preproduction is not a scratch environment.** The signing PIN is per
+signature with no documented reset, `SIGN_PIN_RATE_LIMITED` is a real code, and
+an identity whose PIN locks may not be recoverable. Write the PIN down when you
+set one.
 
-Whether a synthetic DNI passes is the unresolved part, and the mirror argues both
-ways. The testing checklist closes with *«Usá usuarios y documentos sintéticos o
-autorizados para pruebas»* (`sdk-integracion__ambientes-versionado.md`). But
-`ONBOARDING` runs identity validation with Veriff and data validation against
-RENAPER as steps 4 and 5, and *«si DNI y sexo fueron proporcionados por el
-backend, el paso de captura se omite, pero la validación de identidad y RENAPER
-se realiza igualmente»* (`sdk-integracion__flujos-identidad.md`). Either
-preproduction stubs both providers, or *«sintéticos»* covers the documents and
-*«autorizados»* covers the people. Ask before assuming; the readings differ by
-whether every test signer has to be a consenting human.
+**An account is one per email, not one per DNI** — measured 2026-09-21, when the
+same person onboarded a third time under a new address and received a new
+certificate (`docs/research/ADDENDUM-quota.md`). So a test signer is any mailbox
+you control; what you cannot fake is the person. `ONBOARDING` runs a live
+biometric check (the widget is branded *FID by Lakaut*; the docs say Veriff) and
+it rejects a bad capture, so *«usuarios sintéticos»*
+(`sdk-integracion__ambientes-versionado.md`) does not extend to the identity
+step: every onboarding needs a consenting human in front of a camera, three
+attempts allowed. Lakaut has not offered a synthetic-identity path when asked.
 
-Treat onboarding a test subject as possibly unrepeatable, and run PIN-bearing
-experiments last. `sessions.getSigningEligibility({ externalUserRef, email })` is
-the one probe that costs nothing: no session, no PIN, no certificate, and it
-answers whether an identity already holds one.
+Run PIN-bearing experiments last.
+`sessions.getSigningEligibility({ externalUserRef, email })` is the one probe
+that costs nothing: no session, no PIN, no certificate, and it answers whether
+an identity already holds one.
 
 ### Channel drift, measured 2026-09-11
 

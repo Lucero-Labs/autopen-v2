@@ -1,44 +1,62 @@
 # autopen-v2
 
-A **signing and evidence core**. Given a pre-built PDF and a set of
-precondition rules, it gates the document, seals it, runs a signature ceremony
-through [Lakaut](https://lakautac.com.ar), an Argentine certifying authority,
-ingests the signed artefact and assembles a verifiable evidence bundle.
+A **signing and evidence core**. Given a PDF and a set of precondition rules, it
+gates the document, seals it, runs a qualified-signature ceremony through
+[Lakaut](https://lakautac.com.ar), an Argentine certifying authority, verifies
+the signed artefact and keeps custody of it.
 
-The first document is an Argentine *pagaré*; its rule set is
-`packages/rules-pagare-ar`.
+It is built to be the same core under more than one product. A product supplies
+its own document, its own rules and its own UI; the core supplies everything
+between "these bytes" and "this person signed them, and here is the proof". The
+first product is Lucero's Argentine *pagaré*.
 
 ## Where to look
 
 | Question | Read |
 | --- | --- |
+| I want to build a product on this. What do I call, what do I own? | [`docs/building-on-autopen.md`](docs/building-on-autopen.md) |
 | Why is the core shaped this way? | `docs/research/RESULT-001-core-signing-evidence.md` §1–§3, then the `ADDENDUM` |
 | What is the work? | The open GitHub issues |
 | How is a ticket designed before coding? | `docs/design/` |
 | What does the vendor actually say? | `docs/vendor/lakaut/` — a faithful mirror at SDK `0.1.0-rc.40` |
-| What is being built, as designed? | `docs/product/` — prototype + brief |
+| What is the pagaré product, as designed? | `docs/product/` — prototype + brief. A product on the core, not the core |
 | How do I work in this repo? | [`AGENTS.md`](AGENTS.md) (the repo), [`STYLES.md`](STYLES.md) (the code) |
 
 ## What exists
 
+The core — product-agnostic, and the part any product builds on:
+
 ```
 packages/core/             contracts, error classes, and the signing spine. Zero dependencies.
 packages/gate/             PolicyGate engine, InMemoryPolicyRegistry, rule factories
-packages/rules-pagare-ar/  the Argentine pagaré rule set
 packages/adapter-lakaut/   the Lakaut provider, behind the SignatureProvider port
-apps/                      deployable products (empty so far — see apps/README.md)
+packages/tsconfig/         shared compiler settings
 ```
 
-`@autopen/gate` decides whether a subject may proceed to an irreversible step,
-knowing nothing about what it is gating. `@autopen/rules-pagare-ar` is the first
-policy registered with it; `packages/gate/README.md` shows how to compose one.
+The pagaré product — the first thing built on it:
+
+```
+packages/rules-pagare-ar/  the Argentine pagaré rule set, registered with the gate
+docs/product/              the pagaré product's prototype and brief
+```
+
+And a demo:
+
+```
+apps/signing-demo/         runs the whole spine against preproduction from a page
+```
 
 The spine is `seal → openCeremony → ingest → reconcile`, with
 `@autopen/adapter-lakaut` implementing the provider port against the SDK at
-exact `0.1.0-rc.40`. `docs/design/signing-spine.md` explains what the SDK's own
-types changed about it. Rendering, the liquidación and the evidence bundle are
-not built. Preproduction access is live — see AGENTS.md, "Vendor access",
-including why it is not a scratch environment.
+exact `0.1.0-rc.40`. It has signed real documents in preproduction, end to end,
+with custody verified against the provider's record. `@autopen/gate` decides
+whether a subject may proceed, knowing nothing about what it is gating;
+`packages/gate/README.md` shows how to compose a policy.
+
+Not built yet: the evidence bundle (`assemble`), durable stores, and a webhook
+relay so that more than one product can receive events — Lakaut allows one
+webhook URL per environment. See AGENTS.md, "Vendor access", for why
+preproduction is not a scratch environment.
 
 ## Running it
 

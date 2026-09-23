@@ -283,3 +283,33 @@ event — which means it needs a webhook, an alert and a human, not a retry.
     current?
 13. An identity onboarded through the SDK has no portal password, so neither we
     nor the signer can see their balance anywhere.
+
+## Resolved 2026-09-21 · signatures work, and three things we learned
+
+Lakaut allocated a package of 100 signatures to the integration after finishing
+their environment migration. The same afternoon, three documents were signed in
+preproduction and each verified against the provider's record through
+`verifyAndAcknowledgeSignedArtifact`, with custody completing before the binding
+(STYLES §9.5). Sessions `b8e0cb8c-…`, `6f07fe73-…` and `5507c634-…`.
+
+**The account gate is per email, not per DNI.** `santi@divine.inc` — the same
+person as the two existing accounts — onboarded end to end, received a new
+certificate (`4667FF52E46CDCB2`) and signed. AGENTS.md had stated "one account
+per DNI" without a citation; nothing in the vendor mirror says it, and this
+disproves it. Any mailbox one controls is a new test signer. The identity step
+remains live (§8), so the person still has to be real.
+
+**A session stays `open` after a successful signature.** `getSession` reported
+`state: open`, `errorCode: null` for every signed ceremony. The document being
+signed and the session being closed are separate facts, which is what
+`CeremonyState` having no `signed` state was built to express (signing-spine.md
+§2.3); now it is observed rather than argued.
+
+**Webhook verification is broken on the vendor's side.** With the destination
+saved, a fresh secret installed and the endpoint answering 401 to unsigned
+POSTs, *Verificar destino* fails with *"No se pudo completar la operación de
+integraciones"* — and the tunnel's request log shows no request from Lakaut at
+all. The verification window on a freshly generated secret also displays a time
+already past. Reported to Lakaut the same day; `auth.document.signed` has still
+never been observed from a real signature.
+

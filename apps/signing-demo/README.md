@@ -92,8 +92,12 @@ generating a new secret, since the pending one cannot be recovered.
 
 ## Preproduction is not a scratch environment
 
-A Lakaut account is one per DNI, the signing PIN is per signature with no
-documented reset, and `SIGN_PIN_RATE_LIMITED` is a real code. Opening sessions
-is cheap; burning an identity is not. Run `signing` against an identity that
-already holds a certificate before running `onboarding-and-signing` against one
-that does not.
+The signing PIN is per signature with no documented reset, and
+`SIGN_PIN_RATE_LIMITED` is a real code. Opening sessions is cheap; locking an
+identity is not. Run `signing` against an identity that already holds a
+certificate before running `onboarding-and-signing` against one that does not.
+
+An account is one per **email**, so any mailbox you control is a new test
+signer. The identity step is live, though — a real face, three attempts — so a
+new signer is a new address for a consenting person, not a synthetic one
+(AGENTS.md, "Vendor access").
