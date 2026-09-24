@@ -3,12 +3,8 @@
  *
  * The write is the custody sink the core runs between verifying a delivery and
  * registering its binding, so a rejection here cancels the binding rather than
- * leaving an artefact bound but unarchived (STYLES §9.5). The read is what
- * `GET /api/instruments/{id}/artifact` serves. Both sides sit in one store so
- * the thing that archived a copy is the thing asked to produce it.
- *
- * A directory, not a database: this is the service's stand-in for durable custody.
- * The *ordering* is not a stand-in.
+ * leaving an artefact bound but unarchived (STYLES §9.5). A directory, not a
+ * database: the stand-in for durable custody. The ordering is not a stand-in.
  */
 
 import { constants } from "node:fs";
@@ -28,14 +24,7 @@ export interface EvidenceStore {
   readArtifact(documentId: DocumentId): Promise<Uint8Array | undefined>;
 }
 
-/**
- * The evidence directory cannot be written, so the process must not start.
- *
- * Raised at boot rather than at the first delivery: a signed copy that cannot
- * be archived cancels the binding, and discovering that after a signer has
- * spent a PIN is the expensive way (STYLES §0.1). The directory is a path and
- * safe to name.
- */
+/** The evidence directory cannot be written, so the process must not start. */
 export class EvidenceDirectoryUnwritableError extends Error {
   constructor(
     readonly directory: string,
@@ -64,13 +53,7 @@ function fileStem(documentId: string): string {
   return documentId;
 }
 
-/**
- * Writes each artefact as `<documentId>.pdf` beside a `<documentId>.json` manifest.
- *
- * The directory is created on first write, so a freshly mounted volume needs
- * no preparation. Failing the write is the correct way to fail: the core then
- * cancels the binding.
- */
+/** Writes each artefact as `<documentId>.pdf` beside a `<documentId>.json` manifest. */
 export class DirectoryEvidenceStore implements EvidenceStore {
   readonly #directory: string;
 
@@ -82,8 +65,8 @@ export class DirectoryEvidenceStore implements EvidenceStore {
    * Creates the directory if needed and proves it can be written, or throws
    * `EvidenceDirectoryUnwritableError`.
    *
-   * For boot. A volume mounted read-only, or owned by another user, otherwise
-   * surfaces as the first delivery's binding being cancelled.
+   * For boot: a read-only volume otherwise surfaces as the first delivery's
+   * binding being cancelled, after a signer has spent a PIN (STYLES §0.1).
    */
   async ensureWritable(): Promise<void> {
     try {
@@ -97,9 +80,8 @@ export class DirectoryEvidenceStore implements EvidenceStore {
   async archive(artifact: VerifiedArtifact): Promise<void> {
     const stem = fileStem(artifact.documentId);
     await mkdir(this.#directory, { recursive: true });
-    // Two plain writes, no fsync and no write-then-rename: not the vendor's
-    // "custodia durable" idiom, and a crash between them leaves a PDF without
-    // its manifest. The Postgres store replaces this; the service does not fix it.
+    // Known gap: two plain writes, no fsync, no write-then-rename — not the
+    // vendor's "custodia durable". The Postgres store replaces this.
     await writeFile(join(this.#directory, `${stem}.pdf`), artifact.bytes);
     await writeFile(
       join(this.#directory, `${stem}.json`),

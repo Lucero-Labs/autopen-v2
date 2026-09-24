@@ -1,11 +1,7 @@
 /**
- * What the service reads from its environment, one schema per variable.
- *
- * Declared apart from `env.ts` so the constraints can be tested without a
- * process environment: `env.ts` validates `process.env` at import and throws
- * when it is incomplete, which a test of "PORT defaults to 3000" has no
- * business satisfying. Nothing here reads anything; it only says what is read,
- * and every message names what to fix without echoing a value (STYLES §8.1).
+ * What the service reads from its environment, one schema per variable. Kept
+ * apart from `env.ts` so the constraints can be tested without a process
+ * environment; every message names what to fix without echoing a value (§8.1).
  */
 
 import { z } from "zod";
@@ -23,25 +19,20 @@ export const ENV_SCHEMA = Object.freeze({
   LAKAUT_ENVIRONMENT: z.enum(["local", "sandbox", "production"], {
     error: "must be local, sandbox or production",
   }),
-  // The Hosted UI needs camera access, which browsers grant only over https,
-  // and `createSession` accepts any origin — so a wrong one would not fail
-  // until the iframe declines to load (`sdk-integracion__frontend-hosted-ui.md`).
+  // Browsers grant camera access only over https, and `createSession` accepts
+  // any origin: a wrong one fails only when the iframe declines to load
+  // (`sdk-integracion__frontend-hosted-ui.md`).
   LAKAUT_ALLOWED_ORIGIN: z.string({ error: "is required" }).startsWith("https://", {
     error: "must be an https origin declared in the dashboard — the tunnel, not localhost",
   }),
-  // The Hosted UI's own origin, allow-listed by the signing page's CSP and
-  // Permissions-Policy. Configured rather than derived: the vendor says the
-  // integrator "no lo elige ni debe derivarlo del valor `sandbox`", and that
-  // DEV, PREPROD and PROD need not share a host
-  // (`sdk-integracion__seguridad.md`, "Content Security Policy"). Every
-  // session's `hostedUiOrigin` is checked against this value before its
-  // handoff is released, so a stale one fails at the handoff, not in an
-  // iframe that silently refuses to load.
+  // Configured rather than derived: the integrator "no lo elige ni debe
+  // derivarlo del valor `sandbox`" (`sdk-integracion__seguridad.md`, "Content
+  // Security Policy").
   LAKAUT_HOSTED_UI_ORIGIN: z.string({ error: "is required" }).startsWith("https://", {
     error: "must be the https origin of the Hosted UI, as given at onboarding",
   }),
-  // Optional: blank until a destination is saved in the dashboard, which is
-  // correct. The webhook route refuses deliveries while it is unset.
+  // Blank until a destination is saved in the dashboard; the webhook route
+  // refuses deliveries meanwhile.
   LAKAUT_WEBHOOK_SECRET: z.string().optional(),
   // Railway injects one; a laptop takes the default.
   PORT: z.coerce
@@ -52,12 +43,10 @@ export const ENV_SCHEMA = Object.freeze({
     .default(DEFAULT_PORT),
   // Where verified signed copies are archived. Unset, the app's own `evidence/`.
   EVIDENCE_DIR: z.string().optional(),
-  // The one key the product-facing routes require. Its value never reaches a
-  // report: the reporter in `env.ts` prints names and messages only.
+  // The one key the product-facing routes require.
   AUTOPEN_API_KEY: z.string({ error: "is required" }).min(32, {
     error: "must be at least 32 characters — generate one with `openssl rand -base64 32`",
   }),
-  // Optional. Only its host and port are used, by the health check's TCP
-  // probe; nothing here opens a database connection.
+  // Only its host and port are used, by the health check's TCP probe.
   DATABASE_URL: z.url({ error: "must be a URL naming the database host" }).optional(),
 });

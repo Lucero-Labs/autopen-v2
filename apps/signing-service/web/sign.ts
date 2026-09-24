@@ -1,18 +1,12 @@
 /**
  * The signing page: what a link opens, and the only thing a signer sees.
  *
- * No form and no choices. The token in the path is the whole input; the page
- * asks the backend for its handoff, mounts the ceremony, and posts back what
- * the ceremony delivers. Every decision — journey, factors, whether there is
- * anything left to sign — is the backend's (`src/routes.ts`).
- *
- * No `@lakaut/*` import appears here. The renderer lives behind
- * `@autopen/adapter-lakaut/browser` for the same reason the session client
- * does (STYLES §2), so this file speaks only in the core's vocabulary.
- *
- * `lakaut.flow.completed` moves the status line and nothing else: "signed" is
- * written only after the backend has verified the delivered copy, or after it
- * says so when asked (STYLES §9.1).
+ * The token in the path is the whole input; the page asks the backend for its
+ * handoff, mounts the ceremony, and posts back what the ceremony delivers.
+ * Every decision is the backend's (`src/routes.ts`). No `@lakaut/*` import:
+ * the renderer lives behind `@autopen/adapter-lakaut/browser` (STYLES §2).
+ * `lakaut.flow.completed` moves the status line and nothing else; "signed" is
+ * written only once the backend has verified the copy (STYLES §9.1).
  */
 
 import {
@@ -45,12 +39,7 @@ const token = window.location.pathname
 let mounted: MountedCeremony | undefined;
 let onRetry: (() => void) | undefined;
 
-/**
- * A failure with a line written for the signer.
- *
- * What went wrong goes to the console for whoever is debugging; the signer
- * reads only `line`. Ops instructions have no business on this page.
- */
+/** A failure with a line written for the signer; what went wrong goes to the console. */
 class SignerFacingError extends Error {
   constructor(
     readonly line: string,
@@ -106,17 +95,11 @@ retry.addEventListener("click", () => {
 /**
  * Refuses to mount into an origin the session was not issued for.
  *
- * The Hosted UI declines to be framed by anything other than the session's
- * `allowedOrigin`, and the browser reports that as a bare "refused to connect"
- * inside an empty iframe — a message that names neither origin and points at
- * Lakaut rather than at the mismatch. The session is created successfully
- * beforehand, because the API validates the origin it is *given*, not the one
- * the page turns out to be served from.
- *
- * So check it here, where both values are known. A handoff that does not
- * state its origin fails the same way: what cannot be checked is not assumed
- * to match (STYLES §0.1). The two origins go to the console, for whoever is
- * configuring the server; the signer sees only that this is the wrong page.
+ * The Hosted UI declines to be framed by any other origin, and the browser
+ * reports that as a bare "refused to connect" that names neither one; the API
+ * validates the origin it is given, not the one the page is served from. So
+ * check here, where both are known. A handoff that states no origin fails the
+ * same way (STYLES §0.1).
  */
 function assertOriginMatches(handoff: CeremonyHandoff): void {
   const issuedFor = handoff.context.allowedOrigin;
@@ -212,8 +195,8 @@ function describeCeremony(ceremony: NonNullable<StatusResponse["ceremony"]>): st
 /**
  * Reads the backend's view and moves the line only for a state that is final.
  *
- * `awaiting-*` is left alone: a completed flow whose delivery is still being
- * verified must not be told anything less than "verificando".
+ * `awaiting-*` is left alone: a flow whose delivery is still being verified
+ * must not be told anything less than "verificando".
  */
 async function readStatus(): Promise<void> {
   if (token === undefined) return;
@@ -233,21 +216,12 @@ async function readStatus(): Promise<void> {
 /**
  * Posts the delivered copy for verification, and offers to post it again.
  *
- * Rejects when the backend did not confirm receipt, because the renderer
- * passes this rejection straight to the Hosted UI (`renderer.ts`,
- * `onDocumentSigned`), and only a rejection makes it emit
+ * Rejects when the backend did not confirm receipt: the renderer passes the
+ * rejection to the Hosted UI, and only a rejection makes it emit
  * `signed_document_delivery_failed` and keep the signer's download option
- * (`sdk-integracion__documentos-firma.md`, "Falla de entrega"). Resolving
- * would tell it the copy was received when it was refused.
- *
- * The retry posts the same bytes again from this closure and never mounts a
- * second ceremony: the document is already signed at the provider, and the
- * vendor does not repeat the cryptographic operation on a rejection — so the
- * retry needs no mount, only the delivery it already holds (STYLES §9.1).
- *
- * Posted under the link's own token: the backend checks the delivery names
- * that instrument's ceremony and document, so the body cannot steer a copy
- * onto another instrument.
+ * (`sdk-integracion__documentos-firma.md`, "Falla de entrega"). The retry
+ * posts the same bytes again and never mounts a second ceremony: the document
+ * is already signed at the provider (STYLES §9.1).
  */
 async function deliver(linkToken: string, delivery: SignedDelivery): Promise<void> {
   say(STATUS_LINES.verifying);
@@ -295,8 +269,7 @@ async function start(): Promise<void> {
 
   const opened = payload as HandoffResponse | StatusResponse;
   if (!("handoff" in opened)) {
-    // Nothing to mount: signed already, or a session that ended without a
-    // signature. The backend has said which; the page only repeats it.
+    // Nothing to mount: signed already, or a session that ended without a signature.
     if (opened.ceremony !== undefined) note(describeCeremony(opened.ceremony));
     say(
       opened.state === "signed"
@@ -326,8 +299,7 @@ async function start(): Promise<void> {
       const failed = event.type === "lakaut.flow.failed";
       note(describeEvent(event), failed);
       if (failed) say(STATUS_LINES.failed);
-      // The visual experience ending is a cue to go and read the record,
-      // never a conclusion in itself.
+      // The visual experience ending is a cue to read the record, not a conclusion.
       if (event.type === "lakaut.flow.completed" || failed) {
         void readStatus();
       }

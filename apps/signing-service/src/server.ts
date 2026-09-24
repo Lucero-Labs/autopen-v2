@@ -1,19 +1,12 @@
 /**
  * The signing service: one API for products, one page for signers, over the core.
  *
- * Deliberately the smallest thing that is still honest about the invariants it
- * demonstrates. It seals real bytes, opens a real ceremony, and reconciles
- * against the provider's own record rather than the browser's word for it
- * (STYLES §9.1). Everything it persists lives in memory or in a directory, so
- * restarting it forgets everything but the archived copies.
- *
- * What it is not: a product. There is no policy gate in front of the seal, no
- * durable store behind it, and one shared API key rather than a product's
- * own. Anything here that looks like a decision was made for this service, not for
- * the core — the core's decisions are in `docs/design/signing-spine.md`.
- *
- * This file is wiring only: the environment, the ports, and `listen`. The
- * routes themselves are in `routes.ts`, which never sees the environment.
+ * Wiring only: the environment, the ports, and `listen`. The routes are in
+ * `routes.ts`, which never sees the environment. Everything persisted lives in
+ * memory or in a directory, so a restart forgets everything but the archived
+ * copies. Not a product: no policy gate in front of the seal, no durable store
+ * behind it, one shared API key. The core's own decisions are in
+ * `docs/design/signing-spine.md`.
  */
 
 import { createServer } from "node:http";
@@ -35,8 +28,8 @@ import { createRouter } from "./routes.ts";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const WEB = join(HERE, "..", "web");
-// A mounted volume on a host, the app's own directory on a laptop. Resolved
-// once so the log line names the absolute path the copies actually land in.
+// A mounted volume on a host, the app's own directory on a laptop. Resolved so
+// the log line names the absolute path.
 const EVIDENCE =
   env.EVIDENCE_DIR !== undefined ? resolve(env.EVIDENCE_DIR) : join(HERE, "..", "evidence");
 
@@ -63,9 +56,7 @@ const core = new DefaultSigningCore({
   maxDocumentBytes: LAKAUT_MAX_DOCUMENT_BYTES,
 });
 
-// Fail closed at boot: a copy that cannot be archived cancels its binding, and
-// finding that out after a signer has spent a PIN is the expensive way
-// (STYLES §0.1). The message names the path, which is safe to print.
+// Fail closed at boot (STYLES §0.1); the message names only the path.
 const evidence = new DirectoryEvidenceStore(EVIDENCE);
 try {
   await evidence.ensureWritable();
@@ -85,10 +76,8 @@ const server = createServer(
     ids: cryptoInstrumentIds,
     allowedOrigin: env.LAKAUT_ALLOWED_ORIGIN,
     hostedUiOrigin: env.LAKAUT_HOSTED_UI_ORIGIN,
-    // Read once rather than per request: rotation is a deploy, not a reload,
-    // and a value that can change under a running verifier is how a rotation
-    // silently half-applies. Blank until a destination is saved in the
-    // dashboard, which is correct.
+    // Read once, not per request: rotation is a deploy, not a reload, and a
+    // value that changes under a running verifier half-applies.
     webhookSecret: env.LAKAUT_WEBHOOK_SECRET,
     webRoot: WEB,
     apiKey: env.AUTOPEN_API_KEY,
@@ -97,17 +86,15 @@ const server = createServer(
     now: () => new Date(),
   }),
 ).listen(env.PORT, () => {
-  // Safe to log: a port, a declared origin and a directory. No key, no URL
-  // with a password in it (STYLES §8.1).
+  // Safe to log: a port, a declared origin and a directory (STYLES §8.1).
   console.log(
     `listening on port ${env.PORT}  declared origin ${env.LAKAUT_ALLOWED_ORIGIN}  evidence ${EVIDENCE}`,
   );
 });
 
-// In a container Node is PID 1, and PID 1 gets no default signal disposition:
-// without a handler SIGTERM is ignored, the host waits out its grace period
-// and then kills the process mid-request. Stop accepting, let in-flight
-// requests finish, and exit cleanly instead.
+// In a container Node is PID 1, which gets no default signal disposition:
+// without a handler SIGTERM is ignored and the host kills the process
+// mid-request once its grace period is out.
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.once(signal, () => {
     console.log(`${signal} received, closing`);

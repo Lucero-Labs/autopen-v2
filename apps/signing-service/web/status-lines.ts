@@ -2,9 +2,7 @@
  * What the signing page says, in the signer's language.
  *
  * Kept apart from `sign.ts` so a test can assert the exact text without a DOM
- * (STYLES §10): the message is the product, and a test that passes when it
- * changes protects nothing. Operator-facing text is Spanish and lives beside
- * the code that emits it, not in a UI layer (STYLES §3.2).
+ * (STYLES §10).
  */
 
 /** The one line above the ceremony. */
