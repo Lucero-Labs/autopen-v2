@@ -1,5 +1,5 @@
 /**
- * The demo's HTTP surface, built from its dependencies rather than from the
+ * The service's HTTP surface, built from its dependencies rather than from the
  * environment.
  *
  * Two pages sit on it. The issuer's page (`/`) creates an instrument and gets a

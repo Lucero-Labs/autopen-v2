@@ -1,5 +1,5 @@
 /**
- * What the demo reads from its environment, one schema per variable.
+ * What the service reads from its environment, one schema per variable.
  *
  * Declared apart from `env.ts` so the constraints can be tested without a
  * process environment: `env.ts` validates `process.env` at import and throws

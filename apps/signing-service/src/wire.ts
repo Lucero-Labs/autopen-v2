@@ -10,7 +10,7 @@
 import type { CeremonyDisposition, CeremonyHandoff, CeremonyState } from "@autopen/core";
 
 /**
- * Whether the demo holds a verified signed copy.
+ * Whether the service holds a verified signed copy.
  *
  * Two values only, and `signed` is set exclusively after `ingest` resolves:
  * the browser saying the flow completed, or the provider saying the session
@@ -22,7 +22,7 @@ export type InstrumentState = "awaiting-signature" | "signed";
  * What the signing page is told when it asks for its status.
  *
  * Wider than `InstrumentState` on purpose. `signed` still means only that the
- * demo holds a verified copy. The rest restate the provider's own view of the
+ * service holds a verified copy. The rest restate the provider's own view of the
  * ceremony so the end screen can say why nothing was signed, and
  * `awaiting-delivery` names the gap the design document calls out: signed at
  * the provider, nothing in our custody yet.
@@ -87,7 +87,7 @@ export interface DeliveryResponse {
 /**
  * What `GET /health` reports about the database, from a TCP probe of its host and port.
  *
- * `unconfigured` is not a fault: the demo runs without a database. The other
+ * `unconfigured` is not a fault: the service runs without a database. The other
  * two say whether the configured host answered, and nothing about which host.
  */
 export type DatabaseReachability = "unconfigured" | "reachable" | "unreachable";
@@ -97,7 +97,7 @@ export type DatabaseReachability = "unconfigured" | "reachable" | "unreachable";
  *
  * `ok: true` means the process is up and answering; it says nothing about
  * `database`, which is reported alongside and may be `unreachable` while the
- * demo keeps serving. The probe behind `database` runs at most once every ten
+ * service keeps serving. The probe behind `database` runs at most once every ten
  * seconds, so a burst of health checks costs one connection.
  */
 export interface HealthResponse {

@@ -15,6 +15,6 @@ coverage/
 .turbo/
 .claude/designs/
 dist-browser/
-apps/signing-demo/web/client.js
-apps/signing-demo/web/sign.js
-apps/signing-demo/evidence/
+apps/signing-service/web/client.js
+apps/signing-service/web/sign.js
+apps/signing-service/evidence/

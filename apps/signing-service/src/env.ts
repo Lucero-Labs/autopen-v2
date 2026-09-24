@@ -1,5 +1,5 @@
 /**
- * The demo's configuration, validated once at import.
+ * The service's configuration, validated once at import.
  *
  * Fail closed at boot rather than at the first ceremony: a missing or malformed
  * value otherwise surfaces three steps later as a provider error that reads like
