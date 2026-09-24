@@ -100,8 +100,10 @@ after a browser event, on a timer, on a webhook.
 const status = await core.reconcile(ceremony.ceremonyId); // state: open | completed | cancelled | expired | failed
 ```
 
-That is the whole surface. `apps/signing-demo/src/server.ts` is these six calls
-behind HTTP routes; `web/client.ts` is step 4.
+That is the whole surface. `apps/signing-demo/src/routes.ts` is these six calls
+behind HTTP routes; `web/sign.ts` is step 4 as a hosted page — the signer opens
+a link, the page makes one call for its handoff, and the backend has already
+decided the journey.
 
 ## Things that are true whether or not you like them
 

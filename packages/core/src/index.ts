@@ -55,4 +55,5 @@ export {
   CeremonyNotFoundError,
   DocumentNotSealedError,
   CustodyFailedError,
+  DeliveryMismatchError,
 } from "./errors.ts";

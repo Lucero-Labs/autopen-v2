@@ -6,7 +6,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "dist-browser/**", "web/client.js"]
+      "outputs": ["dist/**", "dist-browser/**", "web/client.js", "web/sign.js"]
     },
     "typecheck": {
       "dependsOn": ["^build"],

@@ -38,6 +38,17 @@ export const env = createEnv({
     LAKAUT_ALLOWED_ORIGIN: z.string({ error: "is required" }).startsWith("https://", {
       error: "must be an https origin declared in the dashboard — the tunnel, not localhost",
     }),
+    // The Hosted UI's own origin, allow-listed by the signing page's CSP and
+    // Permissions-Policy. Configured rather than derived: the vendor says the
+    // integrator "no lo elige ni debe derivarlo del valor `sandbox`", and that
+    // DEV, PREPROD and PROD need not share a host
+    // (`sdk-integracion__seguridad.md`, "Content Security Policy"). Every
+    // session's `hostedUiOrigin` is checked against this value before its
+    // handoff is released, so a stale one fails at the handoff, not in an
+    // iframe that silently refuses to load.
+    LAKAUT_HOSTED_UI_ORIGIN: z.string({ error: "is required" }).startsWith("https://", {
+      error: "must be the https origin of the Hosted UI, as given at onboarding",
+    }),
     // Optional: blank until a destination is saved in the dashboard, which is
     // correct. The webhook route refuses deliveries while it is unset.
     LAKAUT_WEBHOOK_SECRET: z.string().optional(),
