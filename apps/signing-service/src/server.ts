@@ -5,8 +5,7 @@
  * `routes.ts`, which never sees the environment. Everything persisted lives in
  * memory or in a directory, so a restart forgets everything but the archived
  * copies. Not a product: no policy gate in front of the seal, no durable store
- * behind it, one shared API key. The core's own decisions are in
- * `docs/design/signing-spine.md`.
+ * behind it, one shared API key.
  */
 
 import { createServer } from "node:http";

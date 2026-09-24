@@ -43,7 +43,6 @@ packages/rules-pagare-ar/  the Argentine pagaré rule set
 packages/adapter-lakaut/   the Lakaut provider. The only package importing @lakaut/*
 packages/tsconfig/         compiler settings every package extends; see its README
 docs/research/             RESULT-001 (architecture investigation) + dated addenda (what changed since)
-docs/design/               one design document per non-trivial change
 docs/vendor/lakaut/        21 mirrored Lakaut doc pages + llms.txt, pinned at SDK rc.40
 docs/product/              the current design prototype and a brief distilled from it
 docs/vendor/prototipo/     the 2026-08-16 prototype, superseded; cited by RESULT-001
@@ -232,9 +231,3 @@ so CI installs with the Nexus credential and never holds the API key.
 
 Both credentials are shown exactly once and Lakaut keeps only a hash. Rotation
 is immediate with no grace period, so a rotation is a deploy, not a chore.
-
-## Design documents
-
-A non-trivial change gets a design document in `docs/design/` before code; the
-directory's README says what one contains. A decision its issue already made
-does not need re-deciding — cite the issue.
