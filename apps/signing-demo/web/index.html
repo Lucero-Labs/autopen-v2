@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>autopen · ceremonia de firma</title>
+    <title>autopen · emitir un instrumento</title>
     <style>
       :root {
         color-scheme: light;
@@ -40,8 +40,7 @@
         font-size: 0.8125rem;
         color: #4a4a46;
       }
-      input,
-      select {
+      input {
         font: inherit;
         padding: 0.4rem 0.5rem;
         border: 1px solid #d6d6d1;
@@ -63,15 +62,24 @@
         color: #1a1a19;
         border: 1px solid #d6d6d1;
       }
-      #lakaut-hosted-ui {
-        width: 100%;
-        min-width: 0;
-        min-height: 810px;
+      #link {
         margin-top: 1rem;
-        overflow: hidden;
+        padding: 1rem;
+        border: 1px solid #e3e3df;
+        border-radius: 8px;
+        background: #fff;
       }
-      /* Above the iframe: the iframe is 810px tall and fixed, so a log below it
-         is off-screen exactly when something has gone wrong and you need it. */
+      #link[hidden] {
+        display: none;
+      }
+      #link code {
+        display: block;
+        margin-top: 0.5rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.75rem;
+        word-break: break-all;
+        user-select: all;
+      }
       #log {
         margin-top: 1.5rem;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -88,29 +96,14 @@
     </style>
   </head>
   <body>
-    <h1>Ceremonia de firma</h1>
+    <h1>Emitir un instrumento</h1>
     <p class="lede">
-      Preproducción. <code>signing</code> supone un certificado ya emitido;
-      <code>onboarding-and-signing</code> lo emite en el momento y exige email y teléfono.
+      Preproducción. El servicio sella el pagaré y devuelve un enlace de firma. Quién firma decide
+      el servicio al abrirlo: <code>signing</code> si ya tiene certificado,
+      <code>onboarding-and-signing</code> si no — y ese caso exige teléfono.
     </p>
 
     <form id="plan">
-      <label>
-        Journey
-        <select name="journey">
-          <option value="auto">auto — lo decide el proveedor</option>
-          <option value="signing">signing</option>
-          <option value="onboarding-and-signing">onboarding-and-signing</option>
-        </select>
-      </label>
-      <label>
-        Factores
-        <select name="factors">
-          <option value="email">email</option>
-          <option value="email-and-sms">email-and-sms</option>
-          <option value="sms">sms</option>
-        </select>
-      </label>
       <label>
         Email
         <input name="email" type="email" required placeholder="firmante@ejemplo.com" />
@@ -128,11 +121,15 @@
         <input name="pesos" type="number" min="1" step="1" required value="1900000" />
       </label>
       <button type="button" id="check">Consultar elegibilidad</button>
-      <button type="submit">Abrir ceremonia</button>
+      <button type="submit">Crear instrumento</button>
     </form>
 
+    <div id="link" hidden>
+      <a id="link-anchor" href="#" target="_blank" rel="noopener">Abrir el enlace de firma</a>
+      <code id="link-url"></code>
+    </div>
+
     <div id="log"></div>
-    <div id="lakaut-hosted-ui"></div>
 
     <script type="module" src="/client.js"></script>
   </body>

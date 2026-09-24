@@ -1,9 +1,9 @@
 # @autopen/signing-demo
 
-Drives the signing spine against Lakaut preproduction, from a page, in both
+Drives the signing spine against Lakaut preproduction, from two pages, in both
 journeys. It exists to answer questions preproduction can only answer by being
 used — not to be a product. There is no policy gate in front of the seal, no
-durable store behind it, no webhook ingress and no authentication of the caller.
+durable store behind it, and no authentication of the caller.
 
 ## Running it
 
@@ -34,26 +34,103 @@ with it — reserve a static domain and declare that once. And the dashboard
 versions its configuration on save, so a newly added origin is not instantly live
 on every node.
 
-## What the page does
+## The two pages
 
-Pick a journey and the factors, and it opens a ceremony with that plan. The two
-are not interchangeable:
+**The issuer's page** (`/`, `web/client.ts`) describes an instrument: the
+signer's email and phone, a reference, an amount. `POST /api/instruments`
+renders the stand-in pagaré, seals it, and answers with a signing link. The
+page shows the link as an anchor and as text to copy; the demo has no way to
+send it, so you carry it to the signer yourself. Sending the same reference
+with the same bytes again returns the same instrument and the same link; the
+same reference with different bytes is refused.
 
-| Journey | Factors the catalogue allows | Who it is for |
-| --- | --- | --- |
-| `signing` | `email`, `sms`, `email-and-sms` | A signer who already holds a certificate |
-| `onboarding-and-signing` | `email-and-sms` only | A signer who does not, so it issues one |
+**The signing page** (`/sign/{token}`, `web/sign.ts`) is what the link opens.
+It has no form and takes no choices. It makes one call, `POST
+/api/sign/{token}/handoff`, and the backend decides the rest:
 
-`auth.email-sms.v1` requires `EMAIL` **and** `PHONE`, which is why onboarding
-asks for a phone and signing does not.
+1. `checkSigningEligibility` for the signer's email, which costs nothing.
+2. `signing` over `email` when they already hold a certificate;
+   `onboarding-and-signing` over `email-and-sms` when they do not — and that
+   journey needs a phone, so an instrument created without one is refused with
+   `409` and nothing is opened. A read that recommends no journey at all
+   (`CERTIFICATE_PREPARING`, `RETRY_LATER`) is also a `409`, because onboarding
+   someone whose certificate is being issued would onboard them twice.
+   (`auth.email-sms.v1` requires `EMAIL` **and** `PHONE`; `signing` also
+   accepts `sms` and `email-and-sms`, but the demo does not need them.)
+3. `openCeremony`, and the handoff is stored against the instrument.
 
-Then, in order: the backend renders a pagaré, seals it, opens the ceremony, and
-returns the renderer handoff. The page mounts the Hosted UI. When the ceremony
-delivers a signed copy the page posts it back, the backend verifies it against
-Lakaut's own record, archives it under `evidence/`, and only then lets the
-binding register. Every lifecycle event is a cue to re-read the authoritative
-status, never a conclusion — `lakaut.flow.completed` means the visual experience
-ended, not that anything is signed (STYLES §9.1).
+Two link openings at once share one flight per token, and two creates with one
+reference share one flight per reference: the provider's `idempotencyKey` is
+discarded on the wire (STYLES §9.6), so session and instrument idempotency are
+enforced here, before anything is called.
+
+The page mounts the Hosted UI with that handoff. When the ceremony delivers a
+signed copy the page posts it to `/api/deliveries`, the backend verifies it
+against Lakaut's own record, archives it under `evidence/`, lets the binding
+register, and only then marks the instrument `signed`. If that post fails the
+page offers to post the same bytes again and rejects the renderer's callback,
+so the Hosted UI emits `signed_document_delivery_failed` and keeps the signer's
+download option (`sdk-integracion__documentos-firma.md`, "Falla de entrega");
+it never mounts a second ceremony, because the document is already signed at
+the provider (STYLES §9.1). A delivery naming a document other than the
+ceremony's is refused with `409` here and, independently, by the core with
+`DeliveryMismatchError`. `GET
+/api/sign/{token}/status` is what the page reads after a lifecycle event:
+`signed` means a verified copy is in custody, `awaiting-delivery` means the
+session completed and we hold nothing yet, and `cancelled`, `expired` and
+`failed` restate the provider's own view with its `errorCode`. A link opened
+after its session reached one of those three states gets that state from the
+handoff route and no handoff: the page says so and mounts nothing.
+
+Bodies are bounded: a request over the provider's PDF ceiling plus base64 and
+JSON overhead is `413` before it is buffered, and a `fileName` over the
+vendor's 180 characters is `400`. A `500` carries only `error interno` and the
+provider's `correlationId` when the failure had one; the message stays in the
+server log, where the ops person is.
+
+Every lifecycle event is a cue to re-read that status, never a conclusion —
+`lakaut.flow.completed` means the visual experience ended, not that anything is
+signed.
+
+The token is 32 random bytes, base64url, and the only thing in the link.
+Nothing logs it: `/sign/{token}` and `/api/sign/{token}/…` are redacted before
+a request path is printed, an unknown token gets a `404` and no log line, and
+the test suite runs a whole flow with the console captured — objects rendered
+the way Node renders them, not as `[object Object]` — to prove the token, the
+handoff's client token, the signer's email and phone, and the PDF bytes never
+appear (STYLES §8.1). The API key is not among the router's inputs, so that
+test says nothing about it; `env.ts` is where it is kept out of reports.
+
+### Headers on `/sign/*`
+
+The signing page, and only it, is served with the two headers
+`docs/vendor/lakaut/sdk-integracion__seguridad.md` asks for: a
+`Content-Security-Policy` of `frame-src 'self' <hosted-ui-origin>` with
+`child-src` kept aligned, and a `Permissions-Policy` allowing camera and
+microphone for `self` and that origin — plus `Referrer-Policy: no-referrer`,
+ours, because the token is the URL. The origin is `LAKAUT_HOSTED_UI_ORIGIN`,
+configured per environment rather than derived from `LAKAUT_ENVIRONMENT` —
+the vendor says not to — and every session's `hostedUiOrigin` is checked
+against it before its handoff is released, so a stale value fails at the
+handoff with both origins named rather than as an iframe the browser refuses
+to load. No other CSP directive is set: the vendor recommends only these, and
+one it did not ask for cannot be verified without a live ceremony.
+
+The page's layout is bare on purpose: `body { margin: 0 }`, one full-width
+container at least 810px tall, no `overflow: hidden`, no CSS transform, nothing
+sticky or fixed. The Hosted UI iframe is a fixed 810px and clips otherwise
+(`sdk-integracion__frontend-hosted-ui.md`, "Tamaño y responsive").
+
+### Deferred: a stored handoff whose client token has died
+
+A reload of the signing page with a session still `open` — or `completed`
+with no copy in custody — gets the stored handoff again, as-is. Its client
+token may have expired or been consumed since it was issued, and neither the
+reconcile nor the handoff route can tell. The SDK's lifecycle event tells the
+page when the handoff is no longer usable, and the page reports that rather
+than opening a second session. Recovering a session server-side is a later
+change. (A session that is cancelled, expired or failed is not this case: the
+handoff route reconciles first and hands nothing off.)
 
 ## What it is standing in for
 

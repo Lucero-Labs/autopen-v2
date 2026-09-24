@@ -108,3 +108,23 @@ export class CustodyFailedError extends CoreError {
     super(`Custody failed for document "${documentId}"`);
   }
 }
+
+/**
+ * A delivery names a document that is not the one its ceremony was opened for.
+ *
+ * The provider would refuse the cross-check anyway, but only after the bytes
+ * have travelled and custody may have run. Refusing here keeps a signed copy
+ * from ever being filed against the wrong instrument (STYLES §4, §9.2).
+ */
+export class DeliveryMismatchError extends CoreError {
+  constructor(
+    readonly ceremonyId: string,
+    readonly documentId: string,
+    readonly deliveredDocumentId: string,
+  ) {
+    super(
+      `Ceremony "${ceremonyId}" was opened for document "${documentId}" ` +
+        `but the delivery names "${deliveredDocumentId}"`,
+    );
+  }
+}

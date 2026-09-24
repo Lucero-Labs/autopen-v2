@@ -16,4 +16,5 @@ coverage/
 .claude/designs/
 dist-browser/
 apps/signing-demo/web/client.js
+apps/signing-demo/web/sign.js
 apps/signing-demo/evidence/

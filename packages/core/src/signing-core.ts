@@ -7,7 +7,12 @@
  * rather than proceeding on an assumption.
  */
 
-import { CeremonyNotFoundError, CustodyFailedError, DocumentNotSealedError } from "./errors.ts";
+import {
+  CeremonyNotFoundError,
+  CustodyFailedError,
+  DeliveryMismatchError,
+  DocumentNotSealedError,
+} from "./errors.ts";
 import { seal } from "./seal.ts";
 import type {
   Ceremony,
@@ -93,6 +98,10 @@ export class DefaultSigningCore implements SigningCore {
    * it has to run before the binding is registered (STYLES §9.5). A sink that
    * rejects therefore cancels the binding; the failure is wrapped so the
    * original is never lost (STYLES §6.1).
+   *
+   * The delivery must name the document its ceremony was opened for. That is
+   * checked here, before the provider sees any bytes, because a copy filed
+   * against the wrong instrument is the failure §9.2 exists to prevent.
    */
   async ingest(delivery: SignedDelivery, custody: CustodySink): Promise<VerifiedArtifact> {
     const document = await this.#documents.get(delivery.documentId);
@@ -103,6 +112,13 @@ export class DefaultSigningCore implements SigningCore {
     const ceremony = await this.#ceremonies.get(delivery.ceremonyId);
     if (ceremony === undefined) {
       throw new CeremonyNotFoundError(delivery.ceremonyId);
+    }
+    if (ceremony.documentId !== delivery.documentId) {
+      throw new DeliveryMismatchError(
+        delivery.ceremonyId,
+        ceremony.documentId,
+        delivery.documentId,
+      );
     }
 
     try {

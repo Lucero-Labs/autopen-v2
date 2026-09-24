@@ -12,6 +12,7 @@
       "!**/dist",
       "!**/dist-browser",
       "!**/web/client.js",
+      "!**/web/sign.js",
       "!**/node_modules",
       "!**/.turbo",
       "!pnpm-lock.yaml"

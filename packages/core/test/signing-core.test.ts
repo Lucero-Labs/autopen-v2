@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CeremonyNotFoundError,
   CustodyFailedError,
+  DeliveryMismatchError,
   DocumentNotSealedError,
 } from "../src/errors.ts";
 import { DefaultSigningCore } from "../src/signing-core.ts";
@@ -186,6 +187,25 @@ describe("ingest", () => {
     await expect(
       core.ingest(delivery({ documentId: sealed.documentId }), async () => {}),
     ).rejects.toBeInstanceOf(CeremonyNotFoundError);
+  });
+
+  it("refuses a delivery whose document is not the ceremony's, before the provider sees it", async () => {
+    const { core, provider, ceremony } = await readyToIngest();
+    // Sealed, so the document check passes and the mismatch is what refuses.
+    const other = await core.seal(pdf("dos"), "ar.pagare/0002");
+
+    const attempt = core.ingest(
+      delivery({ ceremonyId: ceremony.ceremonyId, documentId: other.documentId }),
+      async () => {},
+    );
+
+    await expect(attempt).rejects.toBeInstanceOf(DeliveryMismatchError);
+    await expect(attempt).rejects.toMatchObject({
+      ceremonyId: ceremony.ceremonyId,
+      documentId: ceremony.documentId,
+      deliveredDocumentId: other.documentId,
+    });
+    expect(provider.custodyRan).toBe(false);
   });
 
   it("lets the provider run custody, because it must finish before the binding", async () => {
