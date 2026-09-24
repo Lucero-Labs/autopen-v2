@@ -1,10 +1,11 @@
 /**
- * The issuer's page: describe an instrument, get a link.
+ * The issuer's page: upload a PDF, name who signs it, get a link.
  *
  * Nothing here mounts a ceremony; the backend decides the journey when the
  * signer opens the link. The page stands in for a product's backend, which is
  * why it holds the API key at all: in `sessionStorage`, dying with the tab,
- * reaching nothing but the `Authorization` header.
+ * reaching nothing but the `Authorization` header. The PDF's bytes go the
+ * same way: to the request body and nowhere else.
  */
 
 import type { InstrumentResponse } from "../src/wire.ts";
@@ -34,7 +35,7 @@ const apiKeyField = document.querySelector("#api-key") as HTMLInputElement;
  * with another signer fails the eligibility read with a bare `INVALID_REQUEST`.
  */
 (form.elements.namedItem("reference") as HTMLInputElement).value =
-  `ar.pagare/harness-${Math.random().toString(36).slice(2, 8)}`;
+  `harness/${Math.random().toString(36).slice(2, 8)}`;
 
 apiKeyField.value = sessionStorage.getItem(API_KEY_STORAGE) ?? "";
 apiKeyField.addEventListener("input", () => {
@@ -69,6 +70,25 @@ async function post(path: string, body: unknown): Promise<unknown> {
     throw new Error(message);
   }
   return payload;
+}
+
+/**
+ * The file's bytes as base64, the way the request carries them.
+ *
+ * `readAsDataURL` encodes in the browser's own code, which a file at the
+ * provider's ceiling would otherwise spend a `btoa` loop on; the payload is
+ * what follows the first comma of `data:application/pdf;base64,…`.
+ */
+function base64Of(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("no se pudo leer el archivo"));
+    reader.onload = () => {
+      const url = typeof reader.result === "string" ? reader.result : "";
+      resolve(url.slice(url.indexOf(",") + 1));
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 /**
@@ -107,13 +127,15 @@ form.addEventListener("submit", (submission) => {
     try {
       log.replaceChildren();
       link.hidden = true;
-      say("creando instrumento…");
+      const pdf = fields.get("pdf");
+      if (!(pdf instanceof File) || pdf.size === 0) throw new Error("elegí un PDF");
+      say(`creando instrumento con ${pdf.name} (${pdf.size} bytes)…`);
 
       const created = (await post("/api/instruments", {
-        email: fields.get("email"),
-        phone: fields.get("phone"),
         reference: fields.get("reference"),
-        montoCentavos: Number(fields.get("pesos")) * 100,
+        fileName: pdf.name,
+        pdfBase64: await base64Of(pdf),
+        signer: { email: fields.get("email"), phone: fields.get("phone") },
       })) as InstrumentResponse;
 
       say(`instrumento ${created.instrumentId}  estado ${created.state}`);

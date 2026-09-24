@@ -52,7 +52,7 @@ it, and keeps it in `sessionStorage` for the tab.
 
 | Route | Answers |
 | --- | --- |
-| `POST /api/instruments` | seals the pagaré, mints the link |
+| `POST /api/instruments` | seals the PDF the product sends, mints the link |
 | `GET /api/instruments/{id}` | the instrument, with its `state` |
 | `GET /api/instruments/{id}/document` | the sealed, unsigned PDF |
 | `GET /api/instruments/{id}/artifact` | the signed PDF; `404` until `state` is `signed` |
@@ -60,6 +60,30 @@ it, and keeps it in `sessionStorage` for the tab.
 
 The two pages and the webhook carry their own credentials — the link token,
 the HMAC — and take no key.
+
+The service does not know what it is sealing. A product renders its own
+document, applies its own rules, and posts the finished file:
+
+```json
+{
+  "reference": "lease/2026-0042",
+  "fileName": "contrato-2026-0042.pdf",
+  "pdfBase64": "JVBERi0xLjQK…",
+  "signer": { "email": "firmante@example.invalid", "phone": "+54911…" }
+}
+```
+
+`reference` is the product's own identifier and becomes part of the document's
+identity. `fileName` is what the signer sees and downloads: at most the vendor's
+180 characters, ending in `.pdf` in any case. `pdfBase64` must be canonical
+base64 that decodes to bytes starting with `%PDF-` (`400` otherwise) and to no
+more than the provider's ceiling (`413`; a body far past it is `413` before it
+is buffered). `phone` is optional until the signer turns out to need
+onboarding. Sending the same reference with the same bytes and the same signer
+again returns the same instrument and the same link, whatever the `fileName`;
+the same reference with different bytes, or with a different email or phone,
+is `409` — the ceremony opens for the signer the instrument stored, so a
+different one needs a new reference.
 
 Two things about tunnels worth knowing before you lose an afternoon to them. An
 ephemeral ngrok subdomain changes on every restart, and the declared origin dies
@@ -69,13 +93,12 @@ on every node.
 
 ## The two pages
 
-**The issuer's page** (`/`, `web/client.ts`) describes an instrument: the
-signer's email and phone, a reference, an amount. `POST /api/instruments`
-renders the stand-in pagaré, seals it, and answers with a signing link. The
-page shows the link as an anchor and as text to copy; the service has no way to
-send it, so you carry it to the signer yourself. Sending the same reference
-with the same bytes again returns the same instrument and the same link; the
-same reference with different bytes is refused.
+**The issuer's page** (`/`, `web/client.ts`) stands in for a product's
+backend: a PDF chosen from disk, the signer's email and phone, and a reference.
+It base64-encodes the file in the browser and posts the body above; the
+service seals the bytes as sent and answers with a signing link. The page
+shows the link as an anchor and as text to copy; the service has no way to
+send it, so you carry it to the signer yourself.
 
 **The signing page** (`/sign/{token}`, `web/sign.ts`) is what the link opens.
 It has no form and takes no choices. It makes one call, `POST
@@ -85,7 +108,8 @@ It has no form and takes no choices. It makes one call, `POST
 2. `signing` over `email` when they already hold a certificate;
    `onboarding-and-signing` over `email-and-sms` when they do not — and that
    journey needs a phone, so an instrument created without one is refused with
-   `409` and nothing is opened. A read that recommends no journey at all
+   `409` and nothing is opened — and since a reference cannot change its
+   signer, the fix is a new reference with a phone. A read that recommends no journey at all
    (`CERTIFICATE_PREPARING`, `RETRY_LATER`) is also a `409`, because onboarding
    someone whose certificate is being issued would onboard them twice.
    (`auth.email-sms.v1` requires `EMAIL` **and** `PHONE`; `signing` also
@@ -169,10 +193,10 @@ handoff route reconciles first and hands nothing off.)
 
 ## What it is standing in for
 
-- **The pagaré.** `src/pagare.ts` writes a one-page PDF with no rendering
-  library. It is deterministic, which is the only property the spine needs from
-  it, and it satisfies none of the instrument's legal requisites. The real
-  renderer is `draft`, operation 1 of RESULT-001 §2.2.
+- **The document.** The service seals whatever PDF a product posts and applies
+  no rules to it. Rendering an instrument and deciding whether it may be sent
+  are the product's (`docs/building-on-autopen.md`, "The split"); the tests
+  build their PDF by hand in `test/fixtures.ts`.
 - **Custody.** Archiving to a directory. The ordering it demonstrates —
   custody completes, *then* the binding registers — is not a stand-in; it is the
   invariant (STYLES §9.5).

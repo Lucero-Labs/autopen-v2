@@ -1,7 +1,8 @@
+import { createEnv } from "@t3-oss/env-core";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { DEFAULT_PORT, ENV_SCHEMA } from "../src/env-schema.ts";
+import { DEFAULT_PORT, ENV_SCHEMA, reportInvalidEnvironment } from "../src/env-schema.ts";
 
 /** Every required variable, as strings, the way a process environment carries them. */
 const COMPLETE: Record<string, string> = Object.freeze({
@@ -72,5 +73,50 @@ describe("the environment schema", () => {
 
     expect(result.success).toBe(false);
     expect(JSON.stringify(messagesOf(result))).not.toContain("short-secret-value");
+  });
+});
+
+describe("the environment reporter", () => {
+  /** `env.ts` minus `process.env`: the same options over a record a test controls. */
+  function boot(runtimeEnv: Record<string, string>): () => unknown {
+    return () =>
+      createEnv({
+        server: ENV_SCHEMA,
+        runtimeEnv,
+        emptyStringAsUndefined: true,
+        onValidationError: reportInvalidEnvironment,
+      });
+  }
+
+  it("throws one error naming each bad variable and its message, and no value", () => {
+    const failing = boot({
+      ...COMPLETE,
+      LAKAUT_API_KEY: "",
+      AUTOPEN_API_KEY: "bogus-autopen-key-value",
+      LAKAUT_INTEGRATOR_ID: "bogus-integrator-value",
+    });
+
+    expect(failing).toThrow(/^the environment is invalid:\n/);
+    expect(failing).toThrow("  LAKAUT_API_KEY is required");
+    expect(failing).toThrow("  AUTOPEN_API_KEY must be at least 32 characters");
+    expect(failing).toThrow(
+      '  LAKAUT_INTEGRATOR_ID must be the canonical UUID under "Empresa / contrato"',
+    );
+    expect(failing).toThrow("Copy .env.example to .env, fill it in, and restart");
+
+    let message = "";
+    try {
+      failing();
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    // Guards a future zod or t3 that puts the input on an issue; today none does.
+    expect(message).not.toContain("bogus-autopen-key-value");
+    expect(message).not.toContain("bogus-integrator-value");
+    expect(message).not.toContain(COMPLETE.LAKAUT_API_KEY);
+  });
+
+  it("lets a complete environment through untouched", () => {
+    expect(boot(COMPLETE)()).toMatchObject({ LAKAUT_ENVIRONMENT: "sandbox", PORT: DEFAULT_PORT });
   });
 });

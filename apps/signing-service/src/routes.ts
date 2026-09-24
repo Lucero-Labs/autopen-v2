@@ -26,6 +26,8 @@ import {
   deriveDocumentId,
   type DocumentId,
   type DocumentStore,
+  looksLikePdf,
+  type SealedDocument,
   sha256,
   type SignedDelivery,
   type SigningCore,
@@ -43,7 +45,6 @@ import {
 import type { EvidenceStore } from "./evidence.ts";
 import type { DatabaseProbe } from "./health.ts";
 import type { Instrument, InstrumentIds, InstrumentStore } from "./instruments.ts";
-import { renderPagare } from "./pagare.ts";
 import type {
   DatabaseReachability,
   DeliveryResponse,
@@ -103,12 +104,18 @@ const MAX_FILE_NAME_CHARS = 180;
  */
 const HEALTH_PROBE_WINDOW_MS = 10_000;
 
-/** What `POST /api/instruments` accepts. The journey and factors are not the issuer's to choose. */
+/** Canonical RFC 4648 base64, padding included; the decoder is lenient, so this comes first. */
+const BASE64_SHAPE = /^[A-Za-z0-9+/]*={0,2}$/;
+
+/**
+ * What `POST /api/instruments` accepts, decoded: the product's finished PDF, its
+ * name, and who signs. The journey and factors are not the product's to choose.
+ */
 interface CreateInstrumentRequest {
-  readonly email: string;
-  readonly phone?: string;
   readonly reference: string;
-  readonly montoCentavos: number;
+  readonly fileName: string;
+  readonly bytes: Uint8Array;
+  readonly signer: Instrument["signer"];
 }
 
 interface DeliveryRequest {
@@ -159,42 +166,91 @@ function correlationIdOf(error: unknown): string | undefined {
   return undefined;
 }
 
-function readString(source: Record<string, unknown>, key: string): string {
+/** The string under `key`, or a 400 naming it as `label`: the dotted path when nested. */
+function readString(source: Record<string, unknown>, key: string, label: string = key): string {
   const value = source[key];
   if (typeof value !== "string" || value === "") {
-    throw new RefusedError(400, `${key} must be a non-empty string`);
+    throw new RefusedError(400, `${label} must be a non-empty string`);
   }
   return value;
+}
+
+/** A `fileName` within the vendor's cap; both routes that carry one read it here. */
+function readFileName(source: Record<string, unknown>): string {
+  const fileName = readString(source, "fileName");
+  if (fileName.length > MAX_FILE_NAME_CHARS) {
+    throw new RefusedError(400, `fileName must be at most ${MAX_FILE_NAME_CHARS} characters`);
+  }
+  return fileName;
+}
+
+/**
+ * The PDF a product sent, decoded from `pdfBase64`, or the refusal it earns.
+ *
+ * Node's decoder skips what is not base64 rather than throwing, so a string
+ * that merely starts well would decode to a plausible header; the shape is
+ * checked before anything is decoded. The exact size check is here too:
+ * `MAX_BODY_BYTES` catches gross oversize before buffering, but only the
+ * decoded length says whether the provider will take the file.
+ */
+function readPdf(source: Record<string, unknown>): Uint8Array {
+  const encoded = readString(source, "pdfBase64");
+  if (!BASE64_SHAPE.test(encoded) || encoded.length % 4 !== 0) {
+    throw new RefusedError(400, "pdfBase64 must be base64");
+  }
+  const bytes = new Uint8Array(Buffer.from(encoded, "base64"));
+  if (!looksLikePdf(bytes)) {
+    throw new RefusedError(400, "pdfBase64 must be a PDF: no %PDF- header");
+  }
+  if (bytes.byteLength > LAKAUT_MAX_DOCUMENT_BYTES) {
+    throw new RefusedError(
+      413,
+      `pdfBase64 must decode to at most ${LAKAUT_MAX_DOCUMENT_BYTES} bytes`,
+    );
+  }
+  return bytes;
 }
 
 function toCreateInstrumentRequest(body: unknown): CreateInstrumentRequest {
   if (!isObject(body)) throw new RefusedError(400, "body must be an object");
 
-  const monto = body.montoCentavos;
-  if (typeof monto !== "number" || !Number.isSafeInteger(monto) || monto <= 0) {
-    throw new RefusedError(400, "montoCentavos must be a positive integer count of centavos");
+  const fileName = readFileName(body);
+  // The delivery route takes the provider's artefact name as it comes; this one
+  // is ours to constrain, and it is what the signer downloads.
+  if (!fileName.toLowerCase().endsWith(".pdf")) {
+    throw new RefusedError(400, "fileName must end with .pdf");
   }
 
-  const phone = body.phone;
+  const signer = body.signer;
+  if (!isObject(signer)) throw new RefusedError(400, "signer must be an object");
+  const phone = signer.phone;
+  if (phone !== undefined && typeof phone !== "string") {
+    throw new RefusedError(400, "signer.phone must be a non-empty string");
+  }
 
   return {
-    email: readString(body, "email"),
     reference: readString(body, "reference"),
-    montoCentavos: monto,
-    ...(typeof phone === "string" && phone !== "" ? { phone } : {}),
+    fileName,
+    bytes: readPdf(body),
+    signer: Object.freeze({
+      email: readString(signer, "email", "signer.email"),
+      // A blank is absent: the harness posts its empty field as "".
+      ...(phone !== undefined && phone !== "" ? { phone } : {}),
+    }),
   };
+}
+
+/** Whether two signers are the same person by the fields the ceremony is opened with. */
+function sameSigner(a: Instrument["signer"], b: Instrument["signer"]): boolean {
+  return a.email === b.email && a.phone === b.phone;
 }
 
 function toDeliveryRequest(body: unknown): DeliveryRequest {
   if (!isObject(body)) throw new RefusedError(400, "body must be an object");
-  const fileName = readString(body, "fileName");
-  if (fileName.length > MAX_FILE_NAME_CHARS) {
-    throw new RefusedError(400, `fileName must be at most ${MAX_FILE_NAME_CHARS} characters`);
-  }
   return {
     ceremonyId: readString(body, "ceremonyId"),
     documentId: readString(body, "documentId"),
-    fileName,
+    fileName: readFileName(body),
     bytesBase64: readString(body, "bytesBase64"),
     signedContentHash: readString(body, "signedContentHash"),
     finalPdfHash: readString(body, "finalPdfHash"),
@@ -202,7 +258,10 @@ function toDeliveryRequest(body: unknown): DeliveryRequest {
   };
 }
 
-/** The link token, wherever it appears in a path, replaced by an ellipsis; every logged path goes through here (§8.1). */
+/**
+ * The link token, wherever it appears in a path, replaced by an ellipsis;
+ * every logged path goes through here (§8.1).
+ */
 function redactPath(pathname: string): string {
   return pathname.replace(/^(\/(?:api\/)?sign)\/[^/]+/, "$1/…");
 }
@@ -424,7 +483,7 @@ function planFor(eligibility: SigningEligibility, signer: Instrument["signer"]):
       throw new RefusedError(
         409,
         "the signer holds no certificate, and onboarding needs a phone: " +
-          "create the instrument again with one",
+          "create the instrument again under a new reference, with a phone",
       );
     }
     return Object.freeze({ journey: "onboarding-and-signing", factors: "email-and-sms" });
@@ -491,45 +550,35 @@ export function createRouter(deps: RouterDependencies): RequestListener {
   }
 
   /**
-   * Seals the stand-in pagaré and mints the link.
+   * Seals the PDF the product sent and mints the link.
    *
-   * Idempotent on `reference`: the same bytes return the existing instrument,
-   * different bytes are refused — a reference names one document (STYLES §9.2).
+   * Idempotent on `reference`: the same bytes and the same signer return the
+   * existing instrument. Different bytes are refused — a reference names one
+   * document (STYLES §9.2) — and so is a different signer, because the
+   * ceremony opens for whoever the instrument stored and a 200 would hide the
+   * swap. The `fileName` is not part of that identity: the first one is kept.
+   *
+   * The id is derived before the single flight and compared after it, so a
+   * concurrent create with different bytes shares the flight and still gets
+   * its 409 rather than the other caller's instrument.
    */
-  function createInstrument(
+  async function createInstrument(
     request: CreateInstrumentRequest,
   ): Promise<{ readonly status: number; readonly instrument: Instrument }> {
-    return singleFlight(creating, request.reference, async () => {
-      const bytes = renderPagare({
-        reference: request.reference,
-        montoCentavos: request.montoCentavos,
-        librador: request.email,
-        lugarDePago: "Ciudad Autónoma de Buenos Aires",
-        vencimiento: "2027-09-11",
-      });
+    const documentId = await deriveDocumentId(request.reference, await sha256(request.bytes));
 
+    const result = await singleFlight(creating, request.reference, async () => {
       const existing = await instruments.findByReference(request.reference);
-      if (existing !== undefined) {
-        const documentId = await deriveDocumentId(request.reference, await sha256(bytes));
-        if (documentId !== existing.documentId) {
-          throw new RefusedError(
-            409,
-            `reference ${request.reference} already names a different document`,
-          );
-        }
-        return { status: 200, instrument: existing };
-      }
+      if (existing !== undefined) return { status: 200, instrument: existing };
 
-      const sealed = await core.seal(bytes, request.reference);
+      const sealed = await core.seal(request.bytes, request.reference);
       const instrument: Instrument = Object.freeze({
         instrumentId: deps.ids.instrumentId(),
         token: deps.ids.token(),
         reference: request.reference,
+        fileName: request.fileName,
         documentId: sealed.documentId,
-        signer: Object.freeze({
-          email: request.email,
-          ...(request.phone !== undefined ? { phone: request.phone } : {}),
-        }),
+        signer: request.signer,
         state: "awaiting-signature",
       });
       await instruments.put(instrument);
@@ -541,6 +590,20 @@ export function createRouter(deps: RouterDependencies): RequestListener {
 
       return { status: 201, instrument };
     });
+
+    if (result.instrument.documentId !== documentId) {
+      throw new RefusedError(
+        409,
+        `reference ${request.reference} already names a different document`,
+      );
+    }
+    if (!sameSigner(result.instrument.signer, request.signer)) {
+      throw new RefusedError(
+        409,
+        `reference ${request.reference} already names a different signer`,
+      );
+    }
+    return result;
   }
 
   function toInstrumentResponse(instrument: Instrument): InstrumentResponse {
@@ -560,14 +623,14 @@ export function createRouter(deps: RouterDependencies): RequestListener {
     return instrument;
   }
 
-  /** The sealed, unsigned PDF: what the signer is shown. */
-  async function sealedBytes(instrument: Instrument): Promise<Uint8Array> {
+  /** The sealed, unsigned document: what the signing page mounts and `/document` serves. */
+  async function sealedDocument(instrument: Instrument): Promise<SealedDocument> {
     const sealed = await deps.documents.get(instrument.documentId);
     if (sealed === undefined) {
       // Stored only after its seal: a missing document is a store bug, not a caller state.
       throw new Error(`document ${instrument.documentId} is not sealed`);
     }
-    return sealed.bytes;
+    return sealed;
   }
 
   /**
@@ -670,18 +733,14 @@ export function createRouter(deps: RouterDependencies): RequestListener {
 
       assertHostedUiOrigin(ceremony.handoff);
 
-      const sealed = await deps.documents.get(instrument.documentId);
-      if (sealed === undefined) {
-        // Stored only after its seal: a missing document is a store bug, not a page state.
-        throw new Error(`document ${instrument.documentId} is not sealed`);
-      }
+      const sealed = await sealedDocument(instrument);
 
       return Object.freeze({
         state: "awaiting-signature",
         // Exactly what the provider produced, never hand-built (§8.2).
         handoff: ceremony.handoff,
         ceremonyId: ceremony.ceremonyId,
-        fileName: `${instrument.reference.replaceAll("/", "-")}.pdf`,
+        fileName: instrument.fileName,
         document: Object.freeze({
           documentId: sealed.documentId,
           contentHash: sealed.contentHash,
@@ -901,7 +960,7 @@ export function createRouter(deps: RouterDependencies): RequestListener {
           json(response, 200, toInstrumentResponse(instrument));
           return;
         case "document":
-          pdf(response, await sealedBytes(instrument));
+          pdf(response, (await sealedDocument(instrument)).bytes);
           return;
         case "artifact":
           pdf(response, await signedBytes(instrument));

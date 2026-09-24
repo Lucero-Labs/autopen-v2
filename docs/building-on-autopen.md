@@ -103,7 +103,20 @@ const status = await core.reconcile(ceremony.ceremonyId); // state: open | compl
 That is the whole surface. `apps/signing-service/src/routes.ts` is these six calls
 behind HTTP routes; `web/sign.ts` is step 4 as a hosted page — the signer opens
 a link, the page makes one call for its handoff, and the backend has already
-decided the journey.
+decided the journey. Over HTTP, step 2 is one request carrying the finished
+PDF — the service renders nothing and knows nothing about what it seals:
+
+```http
+POST /api/instruments
+Authorization: Bearer <AUTOPEN_API_KEY>
+Content-Type: application/json
+
+{ "reference": "lease/2026-0042", "fileName": "contrato-2026-0042.pdf",
+  "pdfBase64": "JVBERi0xLjQK…", "signer": { "email": "…", "phone": "+54911…" } }
+```
+
+The answer carries `instrumentId`, `documentId` and a `signingUrl` to hand to
+the signer; `apps/signing-service/README.md` has the refusals.
 
 ## Things that are true whether or not you like them
 

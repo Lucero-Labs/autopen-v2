@@ -38,7 +38,7 @@ export type {
   SigningCore,
 } from "./signing.ts";
 
-export { sha256, deriveDocumentId, seal } from "./seal.ts";
+export { sha256, deriveDocumentId, looksLikePdf, seal } from "./seal.ts";
 
 export { DefaultSigningCore, type SigningCoreOptions } from "./signing-core.ts";
 

@@ -79,7 +79,11 @@ export async function deriveDocumentId(
 
 const PDF_MAGIC = "%PDF-";
 
-function looksLikePdf(bytes: Uint8Array): boolean {
+/**
+ * Whether `bytes` begin with the `%PDF-` header: the check `seal` makes, exported
+ * so a caller can refuse a non-PDF as bad input before `seal` throws a `TypeError`.
+ */
+export function looksLikePdf(bytes: Uint8Array): boolean {
   if (bytes.length < PDF_MAGIC.length) return false;
   for (let index = 0; index < PDF_MAGIC.length; index += 1) {
     if (bytes[index] !== PDF_MAGIC.charCodeAt(index)) return false;

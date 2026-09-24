@@ -1,9 +1,11 @@
 /**
- * What the service reads from its environment, one schema per variable. Kept
- * apart from `env.ts` so the constraints can be tested without a process
- * environment; every message names what to fix without echoing a value (§8.1).
+ * What the service reads from its environment, one schema per variable, and
+ * how a failed read is reported. Kept apart from `env.ts` so both can be
+ * tested without a process environment; every message names what to fix
+ * without echoing a value (§8.1).
  */
 
+import type { StandardSchemaV1 } from "@t3-oss/env-core";
 import { z } from "zod";
 
 /** The listening port when the environment names none. */
@@ -50,3 +52,25 @@ export const ENV_SCHEMA = Object.freeze({
   // Only its host and port are used, by the health check's TCP probe.
   DATABASE_URL: z.url({ error: "must be a URL naming the database host" }).optional(),
 });
+
+/**
+ * Throws the one boot error, naming each variable and what is wrong with it,
+ * never its value.
+ *
+ * Issues carry no input today; this reporter keeps it that way if a future
+ * zod or t3 version adds one, where the library's default — printing whole
+ * issue objects — would put an API key in the boot log (STYLES §8.1).
+ */
+export function reportInvalidEnvironment(issues: readonly StandardSchemaV1.Issue[]): never {
+  const lines = issues.map((issue) => {
+    const name =
+      issue.path
+        ?.map((segment) => String(typeof segment === "object" ? segment.key : segment))
+        .join(".") ?? "(root)";
+    return `  ${name} ${issue.message}`;
+  });
+  throw new Error(
+    `the environment is invalid:\n${lines.join("\n")}\n` +
+      "Copy .env.example to .env, fill it in, and restart — .env is read at boot only.",
+  );
+}
