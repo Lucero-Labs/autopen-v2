@@ -77,7 +77,7 @@ import { mountCeremony } from "@autopen/adapter-lakaut/browser";
 mountCeremony({
   handoff, container, document: sealed, fileName, language: "es",
   onEvent: (event) => { /* update your UI. Proves nothing. */ },
-  onSigned: async (delivery) => { await fetch("/api/deliveries", { method: "POST", body: encode(delivery) }); },
+  onSigned: async (delivery) => { await fetch("/your/deliveries", { method: "POST", body: encode(delivery) }); },
 });
 ```
 

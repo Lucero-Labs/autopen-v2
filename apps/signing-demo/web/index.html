@@ -100,10 +100,17 @@
     <p class="lede">
       Preproducción. El servicio sella el pagaré y devuelve un enlace de firma. Quién firma decide
       el servicio al abrirlo: <code>signing</code> si ya tiene certificado,
-      <code>onboarding-and-signing</code> si no — y ese caso exige teléfono.
+      <code>onboarding-and-signing</code> si no — y ese caso exige teléfono. La clave de API es la
+      del servicio (<code>AUTOPEN_API_KEY</code>); queda en esta pestaña y en ningún otro lado.
     </p>
 
-    <form id="plan">
+    <!-- method="post": should the script fail to bind, a native submit still
+         never puts the fields — the key among them — in a query string. -->
+    <form id="plan" method="post" action="/api/instruments">
+      <label>
+        Clave de API
+        <input id="api-key" name="apiKey" type="password" autocomplete="off" spellcheck="false" />
+      </label>
       <label>
         Email
         <input name="email" type="email" required placeholder="firmante@ejemplo.com" />

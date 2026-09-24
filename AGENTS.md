@@ -205,7 +205,9 @@ Two templates describe what is read, and both are checked in because neither
 holds a value:
 
 - `.env.example` — the six `LAKAUT_*` variables, each with the constraint that
-  makes it dangerous to get wrong. Copy to `.env`.
+  makes it dangerous to get wrong, and the demo's own four (`PORT`,
+  `EVIDENCE_DIR`, `AUTOPEN_API_KEY`, `DATABASE_URL`), which `env.ts` — still
+  the only reader — validates the same way. Copy to `.env`.
 - `.npmrc.example` — routes the `@lakaut` scope to the private registry and
   takes the Nexus credential from `LAKAUT_NPM_AUTH`. Copy to `.npmrc`.
 

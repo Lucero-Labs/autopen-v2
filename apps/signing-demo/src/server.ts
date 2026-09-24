@@ -5,28 +5,22 @@
  * demonstrates. It seals real bytes, opens a real ceremony, and reconciles
  * against the provider's own record rather than the browser's word for it
  * (STYLES §9.1). Everything it persists lives in memory or in a directory, so
- * restarting it forgets everything.
+ * restarting it forgets everything but the archived copies.
  *
  * What it is not: a product. There is no policy gate in front of the seal, no
- * durable store behind it, and no authentication of the caller. Anything here
- * that looks like a decision was made for the demo, not for the core — the
- * core's decisions are in `docs/design/signing-spine.md`.
+ * durable store behind it, and one shared API key rather than a product's
+ * own. Anything here that looks like a decision was made for the demo, not for
+ * the core — the core's decisions are in `docs/design/signing-spine.md`.
  *
  * This file is wiring only: the environment, the ports, and `listen`. The
  * routes themselves are in `routes.ts`, which never sees the environment.
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  DefaultSigningCore,
-  InMemoryCeremonyLedger,
-  InMemoryDocumentStore,
-  type VerifiedArtifact,
-} from "@autopen/core";
+import { DefaultSigningCore, InMemoryCeremonyLedger, InMemoryDocumentStore } from "@autopen/core";
 import {
   checkSigningEligibility,
   createLakautProvider,
@@ -34,12 +28,20 @@ import {
 } from "@autopen/adapter-lakaut";
 
 import { env } from "./env.ts";
+import { DirectoryEvidenceStore } from "./evidence.ts";
+import { probeDatabase } from "./health.ts";
 import { cryptoInstrumentIds, InMemoryInstrumentStore } from "./instruments.ts";
 import { createRouter } from "./routes.ts";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const WEB = join(HERE, "..", "web");
-const EVIDENCE = join(HERE, "..", "evidence");
+// A mounted volume on a host, the app's own directory on a laptop. Resolved
+// once so the log line names the absolute path the copies actually land in.
+const EVIDENCE =
+  env.EVIDENCE_DIR !== undefined ? resolve(env.EVIDENCE_DIR) : join(HERE, "..", "evidence");
+
+/** How long `/health` waits for the database host before calling it unreachable. */
+const DATABASE_PROBE_TIMEOUT_MS = 2_000;
 
 const LAKAUT = {
   baseUrl: env.LAKAUT_AUTH_BASE_URL,
@@ -61,41 +63,25 @@ const core = new DefaultSigningCore({
   maxDocumentBytes: LAKAUT_MAX_DOCUMENT_BYTES,
 });
 
-/**
- * Writes the verified artefact to disk before the binding is registered.
- *
- * A demo's stand-in for durable custody, but the *ordering* is not a stand-in:
- * the provider calls this between verifying and binding, and a rejection here
- * cancels the binding rather than leaving an artefact bound but unarchived
- * (STYLES §9.5). Failing this write is therefore the correct way to fail.
- */
-async function archive(artifact: VerifiedArtifact): Promise<void> {
-  await mkdir(EVIDENCE, { recursive: true });
-  await writeFile(join(EVIDENCE, `${artifact.documentId}.pdf`), artifact.bytes);
-  await writeFile(
-    join(EVIDENCE, `${artifact.documentId}.json`),
-    JSON.stringify(
-      {
-        documentId: artifact.documentId,
-        signedContentHash: artifact.signedContentHash,
-        finalPdfHash: artifact.finalPdfHash,
-        signatures: artifact.signatures,
-        verifiedAt: artifact.verifiedAt,
-      },
-      null,
-      2,
-    ),
-  );
+// Fail closed at boot: a copy that cannot be archived cancels its binding, and
+// finding that out after a signer has spent a PIN is the expensive way
+// (STYLES §0.1). The message names the path, which is safe to print.
+const evidence = new DirectoryEvidenceStore(EVIDENCE);
+try {
+  await evidence.ensureWritable();
+} catch (error) {
+  console.error(error instanceof Error ? error.message : "evidence directory check failed");
+  process.exit(1);
 }
 
-createServer(
+const server = createServer(
   createRouter({
     core,
     checkEligibility: (subject) => checkSigningEligibility(LAKAUT, subject),
     instruments: new InMemoryInstrumentStore(),
     documents,
     ceremonies,
-    custody: archive,
+    evidence,
     ids: cryptoInstrumentIds,
     allowedOrigin: env.LAKAUT_ALLOWED_ORIGIN,
     hostedUiOrigin: env.LAKAUT_HOSTED_UI_ORIGIN,
@@ -105,7 +91,26 @@ createServer(
     // dashboard, which is correct.
     webhookSecret: env.LAKAUT_WEBHOOK_SECRET,
     webRoot: WEB,
+    apiKey: env.AUTOPEN_API_KEY,
+    environment: env.LAKAUT_ENVIRONMENT,
+    database: () => probeDatabase(env.DATABASE_URL, { timeoutMs: DATABASE_PROBE_TIMEOUT_MS }),
+    now: () => new Date(),
   }),
-).listen(3000, () => {
-  console.log(`listening on http://localhost:3000  declared origin ${env.LAKAUT_ALLOWED_ORIGIN}`);
+).listen(env.PORT, () => {
+  // Safe to log: a port, a declared origin and a directory. No key, no URL
+  // with a password in it (STYLES §8.1).
+  console.log(
+    `listening on port ${env.PORT}  declared origin ${env.LAKAUT_ALLOWED_ORIGIN}  evidence ${EVIDENCE}`,
+  );
 });
+
+// In a container Node is PID 1, and PID 1 gets no default signal disposition:
+// without a handler SIGTERM is ignored, the host waits out its grace period
+// and then kills the process mid-request. Stop accepting, let in-flight
+// requests finish, and exit cleanly instead.
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.once(signal, () => {
+    console.log(`${signal} received, closing`);
+    server.close(() => process.exit(0));
+  });
+}

@@ -28,13 +28,7 @@ import type {
   SignedDelivery,
 } from "@autopen/core";
 
-import type {
-  DeliveryResponse,
-  ErrorResponse,
-  HandoffResponse,
-  SigningStatus,
-  StatusResponse,
-} from "../src/wire.ts";
+import type { ErrorResponse, HandoffResponse, SigningStatus, StatusResponse } from "../src/wire.ts";
 import { DETAIL_LINES, STATUS_LINES } from "./status-lines.ts";
 
 const status = document.querySelector("#status") as HTMLElement;
@@ -250,11 +244,15 @@ async function readStatus(): Promise<void> {
  * second ceremony: the document is already signed at the provider, and the
  * vendor does not repeat the cryptographic operation on a rejection — so the
  * retry needs no mount, only the delivery it already holds (STYLES §9.1).
+ *
+ * Posted under the link's own token: the backend checks the delivery names
+ * that instrument's ceremony and document, so the body cannot steer a copy
+ * onto another instrument.
  */
-async function deliver(delivery: SignedDelivery): Promise<void> {
+async function deliver(linkToken: string, delivery: SignedDelivery): Promise<void> {
   say(STATUS_LINES.verifying);
   try {
-    const verified = (await post("/api/deliveries", {
+    await post(`/api/sign/${encodeURIComponent(linkToken)}/deliveries`, {
       ceremonyId: delivery.ceremonyId,
       documentId: delivery.documentId,
       fileName: delivery.fileName,
@@ -262,14 +260,14 @@ async function deliver(delivery: SignedDelivery): Promise<void> {
       signedContentHash: delivery.signedContentHash,
       finalPdfHash: delivery.finalPdfHash,
       signedAt: delivery.signedAt,
-    })) as DeliveryResponse;
+    });
     say(STATUS_LINES.signed);
-    note(`${DETAIL_LINES.archivedAt} ${verified.archivedTo}`);
+    note(DETAIL_LINES.archived);
   } catch (error) {
     say(STATUS_LINES.deliveryFailed);
     note(describeError(error), true);
     offerRetry(() => {
-      deliver(delivery).catch(report);
+      deliver(linkToken, delivery).catch(report);
     });
     throw error;
   }
@@ -334,7 +332,7 @@ async function start(): Promise<void> {
         void readStatus();
       }
     },
-    onSigned: deliver,
+    onSigned: (delivery) => deliver(token, delivery),
   });
 
   say(STATUS_LINES.ready);
