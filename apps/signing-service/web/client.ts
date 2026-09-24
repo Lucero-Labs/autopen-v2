@@ -4,12 +4,13 @@
  * Nothing here mounts a ceremony. The signer opens the link on `sign.ts`, and
  * the backend decides the journey when they do — this page only says who the
  * signer is and what they sign (`src/routes.ts`).
+ *
+ * The page stands in for a product's backend, which is why it holds the API
+ * key at all. The key is a backend secret; here it lives in `sessionStorage`,
+ * dies with the tab, and reaches nothing but the `Authorization` header.
  */
 
-interface InstrumentResponse {
-  readonly instrumentId: string;
-  readonly signingUrl: string;
-}
+import type { InstrumentResponse } from "../src/wire.ts";
 
 interface Eligibility {
   readonly decision: string;
@@ -17,12 +18,16 @@ interface Eligibility {
   readonly nextAction: string;
 }
 
+/** Where the key is kept for this tab. Never the URL, never a log line. */
+const API_KEY_STORAGE = "autopen.apiKey";
+
 const form = document.querySelector("#plan") as HTMLFormElement;
 const log = document.querySelector("#log") as HTMLElement;
 const check = document.querySelector("#check") as HTMLButtonElement;
 const link = document.querySelector("#link") as HTMLElement;
 const linkAnchor = document.querySelector("#link-anchor") as HTMLAnchorElement;
 const linkUrl = document.querySelector("#link-url") as HTMLElement;
+const apiKeyField = document.querySelector("#api-key") as HTMLInputElement;
 
 /**
  * A reference nobody has used before, generated per page load.
@@ -35,7 +40,12 @@ const linkUrl = document.querySelector("#link-url") as HTMLElement;
  * A fresh reference per load makes that unreachable by accident.
  */
 (form.elements.namedItem("reference") as HTMLInputElement).value =
-  `ar.pagare/demo-${Math.random().toString(36).slice(2, 8)}`;
+  `ar.pagare/harness-${Math.random().toString(36).slice(2, 8)}`;
+
+apiKeyField.value = sessionStorage.getItem(API_KEY_STORAGE) ?? "";
+apiKeyField.addEventListener("input", () => {
+  sessionStorage.setItem(API_KEY_STORAGE, apiKeyField.value);
+});
 
 function say(line: string, fault = false): void {
   const entry = document.createElement("div");
@@ -44,10 +54,16 @@ function say(line: string, fault = false): void {
   log.prepend(entry);
 }
 
+/** The bearer header when a key has been entered; nothing when it has not, so the 401 says so. */
+function authorization(): Record<string, string> {
+  const key = apiKeyField.value;
+  return key === "" ? {} : { authorization: `Bearer ${key}` };
+}
+
 async function post(path: string, body: unknown): Promise<unknown> {
   const response = await fetch(path, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...authorization() },
     body: JSON.stringify(body),
   });
   const payload: unknown = await response.json();
@@ -108,7 +124,7 @@ form.addEventListener("submit", (submission) => {
         montoCentavos: Number(fields.get("pesos")) * 100,
       })) as InstrumentResponse;
 
-      say(`instrumento ${created.instrumentId}`);
+      say(`instrumento ${created.instrumentId}  estado ${created.state}`);
       linkAnchor.href = created.signingUrl;
       linkUrl.textContent = created.signingUrl;
       link.hidden = false;

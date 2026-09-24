@@ -29,5 +29,5 @@ export const DETAIL_LINES = Object.freeze({
   unknownError: "desconocido",
   statusUnreadable: "no se pudo leer el estado:",
   authoritativeState: "estado autoritativo:",
-  archivedAt: "verificado y archivado en",
+  archived: "verificado y archivado",
 } as const);

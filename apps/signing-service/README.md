@@ -1,9 +1,10 @@
-# @autopen/signing-demo
+# @autopen/signing-service
 
 Drives the signing spine against Lakaut preproduction, from two pages, in both
 journeys. It exists to answer questions preproduction can only answer by being
 used — not to be a product. There is no policy gate in front of the seal, no
-durable store behind it, and no authentication of the caller.
+durable store behind it, and one shared API key in front of the product routes
+rather than a key per product.
 
 ## Running it
 
@@ -23,10 +24,42 @@ the page by `postMessage`, which takes no wildcard. An undeclared origin fails
 closed with `403 FORBIDDEN_ORIGIN`.
 
 ```bash
-pnpm --filter=@autopen/signing-demo start
+pnpm --filter=@autopen/signing-service start
 ```
 
-Open the tunnel URL, not `localhost`.
+The `start` script is `node --env-file-if-exists=../../.env dist/server.js`:
+the same command on a laptop, where `.env` exists, and in a container, where
+it does not and the host injects the variables. The flag needs Node 22.9 or
+later (<https://nodejs.org/docs/latest-v22.x/api/cli.html#--env-file-if-existsconfig>);
+`.nvmrc` pins the major, so check the minor if the flag is refused.
+
+Open the tunnel URL, not `localhost`. `GET /health` answers without a key —
+`{ ok, environment, database }`. `ok: true` means the process is up, nothing
+more; `database` is `unconfigured` until `DATABASE_URL` is set and then
+whether its host answered a TCP connect, probed at most once every ten
+seconds. The server refuses to start when the evidence directory cannot be
+written, naming the path.
+
+## The product routes
+
+A product reaches the service with one key, `AUTOPEN_API_KEY`, sent as
+`Authorization: Bearer <key>` and compared in constant time. A missing, wrong
+or malformed header is a `401` whose body says only `unauthorized`, and the
+log line says only `401 <method> <path>` — never the key, never a token, never
+a query string. The key is a backend
+secret; the issuer's page holds it only because the service has no product behind
+it, and keeps it in `sessionStorage` for the tab.
+
+| Route | Answers |
+| --- | --- |
+| `POST /api/instruments` | seals the pagaré, mints the link |
+| `GET /api/instruments/{id}` | the instrument, with its `state` |
+| `GET /api/instruments/{id}/document` | the sealed, unsigned PDF |
+| `GET /api/instruments/{id}/artifact` | the signed PDF; `404` until `state` is `signed` |
+| `POST /api/eligibility` | the free eligibility read — a probe of a person's status, so behind the key too |
+
+The two pages and the webhook carry their own credentials — the link token,
+the HMAC — and take no key.
 
 Two things about tunnels worth knowing before you lose an afternoon to them. An
 ephemeral ngrok subdomain changes on every restart, and the declared origin dies
@@ -39,7 +72,7 @@ on every node.
 **The issuer's page** (`/`, `web/client.ts`) describes an instrument: the
 signer's email and phone, a reference, an amount. `POST /api/instruments`
 renders the stand-in pagaré, seals it, and answers with a signing link. The
-page shows the link as an anchor and as text to copy; the demo has no way to
+page shows the link as an anchor and as text to copy; the service has no way to
 send it, so you carry it to the signer yourself. Sending the same reference
 with the same bytes again returns the same instrument and the same link; the
 same reference with different bytes is refused.
@@ -56,7 +89,7 @@ It has no form and takes no choices. It makes one call, `POST
    (`CERTIFICATE_PREPARING`, `RETRY_LATER`) is also a `409`, because onboarding
    someone whose certificate is being issued would onboard them twice.
    (`auth.email-sms.v1` requires `EMAIL` **and** `PHONE`; `signing` also
-   accepts `sms` and `email-and-sms`, but the demo does not need them.)
+   accepts `sms` and `email-and-sms`, but the service does not need them.)
 3. `openCeremony`, and the handoff is stored against the instrument.
 
 Two link openings at once share one flight per token, and two creates with one
@@ -65,8 +98,10 @@ discarded on the wire (STYLES §9.6), so session and instrument idempotency are
 enforced here, before anything is called.
 
 The page mounts the Hosted UI with that handoff. When the ceremony delivers a
-signed copy the page posts it to `/api/deliveries`, the backend verifies it
-against Lakaut's own record, archives it under `evidence/`, lets the binding
+signed copy the page posts it to `/api/sign/{token}/deliveries` — under its
+own token, and the body must name that instrument's ceremony and document or
+it is `409` — the backend verifies it against Lakaut's own record, archives it
+under `EVIDENCE_DIR` (the app's own `evidence/` when unset), lets the binding
 register, and only then marks the instrument `signed`. If that post fails the
 page offers to post the same bytes again and rejects the renderer's callback,
 so the Hosted UI emits `signed_document_delivery_failed` and keeps the signer's
@@ -166,6 +201,38 @@ a `500`, so a rejected delivery is distinguishable from a broken handler.
 
 Verify the responder before pointing Lakaut at it — a failed challenge means
 generating a new secret, since the pending one cannot be recovered.
+
+## Deploying
+
+`apps/signing-service/Dockerfile` builds the service the way CI does, with the repo root as build context because the workspace is what installs — corepack, the pnpm in
+`packageManager`, `.npmrc.example` copied into place — in three stages, so the
+Nexus credential is read by `pnpm install` in stages the runtime image only
+copies from, and reaches no image layer. It arrives as the build argument
+`LAKAUT_NPM_AUTH`. Railway has no build-only class of variable: it fills
+Dockerfile `ARG`s from the service's variables and injects those same
+variables into the running container, so on Railway `LAKAUT_NPM_AUTH` will
+also be present in the runtime environment. `env.ts` ignores it; nothing at
+runtime reads it. The runtime image runs as `node`, listens on `PORT`, owns a
+default `evidence/` so it boots without a volume, and starts with the service's
+`start` command in exec form so `node` is PID 1 and handles `SIGTERM`.
+
+Service variables, all read by `src/env.ts` and described in `.env.example`:
+
+- `LAKAUT_AUTH_BASE_URL`, `LAKAUT_INTEGRATOR_ID`, `LAKAUT_API_KEY`,
+  `LAKAUT_ENVIRONMENT` — the sandbox credentials, per environment.
+- `LAKAUT_ALLOWED_ORIGIN` — the service's own `https://` domain, exactly.
+- `LAKAUT_HOSTED_UI_ORIGIN` — the Hosted UI's origin, as given at onboarding.
+- `LAKAUT_WEBHOOK_SECRET` — from the dashboard, once the webhook URL is saved.
+- `AUTOPEN_API_KEY` — `openssl rand -base64 32`; the product's key.
+- `EVIDENCE_DIR` — a path on a mounted volume, e.g. `/data/evidence`. The
+  server must be able to write there as the `node` user.
+- `PORT` — Railway injects it. `DATABASE_URL` — optional; `/health` only.
+
+Two dashboard entries, both under the integration, both per environment: the
+service's domain under **Orígenes de la Hosted UI** (already declared for the
+tunnel — replace it with the deployed one), and
+`https://<domain>/api/webhooks/lakaut` as the webhook URL, then **Generar
+secreto** → `LAKAUT_WEBHOOK_SECRET` → redeploy → **Verificar destino**.
 
 ## Preproduction is not a scratch environment
 

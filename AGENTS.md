@@ -198,14 +198,16 @@ for that reason.
 ## Environment
 
 Only apps read the environment, and each validates it once at import:
-`apps/signing-demo/src/env.ts` is the pattern (zod through `@t3-oss/env-core`),
+`apps/signing-service/src/env.ts` is the pattern (zod through `@t3-oss/env-core`),
 reporting a variable's name and never its value. Packages take configuration
 as arguments and never read `process.env` (`adapter-lakaut/src/client.ts`).
 Two templates describe what is read, and both are checked in because neither
 holds a value:
 
 - `.env.example` — the six `LAKAUT_*` variables, each with the constraint that
-  makes it dangerous to get wrong. Copy to `.env`.
+  makes it dangerous to get wrong, and the service's own four (`PORT`,
+  `EVIDENCE_DIR`, `AUTOPEN_API_KEY`, `DATABASE_URL`), which `env.ts` — still
+  the only reader — validates the same way. Copy to `.env`.
 - `.npmrc.example` — routes the `@lakaut` scope to the private registry and
   takes the Nexus credential from `LAKAUT_NPM_AUTH`. Copy to `.npmrc`.
 

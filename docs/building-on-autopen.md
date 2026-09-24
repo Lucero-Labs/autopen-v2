@@ -3,7 +3,7 @@
 For someone writing a product that needs a document signed with a qualified
 signature and the proof kept. You do not need to read the research, the vendor
 mirror or STYLES to build on the core; you need this page, `packages/gate/README.md`
-and `apps/signing-demo/` as the worked example.
+and `apps/signing-service/` as the worked example.
 
 ## The split
 
@@ -77,7 +77,7 @@ import { mountCeremony } from "@autopen/adapter-lakaut/browser";
 mountCeremony({
   handoff, container, document: sealed, fileName, language: "es",
   onEvent: (event) => { /* update your UI. Proves nothing. */ },
-  onSigned: async (delivery) => { await fetch("/api/deliveries", { method: "POST", body: encode(delivery) }); },
+  onSigned: async (delivery) => { await fetch("/your/deliveries", { method: "POST", body: encode(delivery) }); },
 });
 ```
 
@@ -100,7 +100,7 @@ after a browser event, on a timer, on a webhook.
 const status = await core.reconcile(ceremony.ceremonyId); // state: open | completed | cancelled | expired | failed
 ```
 
-That is the whole surface. `apps/signing-demo/src/routes.ts` is these six calls
+That is the whole surface. `apps/signing-service/src/routes.ts` is these six calls
 behind HTTP routes; `web/sign.ts` is step 4 as a hosted page — the signer opens
 a link, the page makes one call for its handoff, and the backend has already
 decided the journey.

@@ -25,11 +25,14 @@ import {
 } from "@autopen/core";
 import type { SigningEligibility } from "@autopen/adapter-lakaut";
 
+import type { EvidenceStore } from "../src/evidence.ts";
+import { probeDatabase } from "../src/health.ts";
 import { cryptoInstrumentIds, InMemoryInstrumentStore } from "../src/instruments.ts";
 import { createRouter, type RouterDependencies } from "../src/routes.ts";
 import type {
   ErrorResponse,
   HandoffResponse,
+  HealthResponse,
   InstrumentResponse,
   StatusResponse,
 } from "../src/wire.ts";
@@ -41,6 +44,8 @@ const HOSTED_UI_ORIGIN = "https://hosted-ui.example.invalid";
 const SIGNER_EMAIL = "firmante@example.invalid";
 const SIGNER_PHONE = "+5491100000000";
 const CLIENT_TOKEN = "client-token-never-logged";
+const API_KEY = "test-api-key-never-logged-0123456789abcdef";
+const DATABASE_PASSWORD = "database-password-never-logged";
 
 const ELIGIBLE: SigningEligibility = Object.freeze({
   decision: "READY_FOR_SIGNING",
@@ -127,22 +132,41 @@ class FakeProvider implements SignatureProvider {
   }
 }
 
+/** Custody in an array: what was archived is what the artifact route can read back. */
+class InMemoryEvidenceStore implements EvidenceStore {
+  readonly archived: VerifiedArtifact[] = [];
+
+  async archive(artifact: VerifiedArtifact): Promise<void> {
+    await Promise.resolve();
+    this.archived.push(artifact);
+  }
+
+  async readArtifact(documentId: string): Promise<Uint8Array | undefined> {
+    await Promise.resolve();
+    return this.archived.find((artifact) => artifact.documentId === documentId)?.bytes;
+  }
+}
+
 interface Harness {
   readonly base: string;
   readonly provider: FakeProvider;
   readonly eligibility: { calls: number; answer: SigningEligibility };
   readonly archived: VerifiedArtifact[];
+  readonly database: { url: string | undefined; probes: number };
+  readonly clock: { now: Date };
   readonly server: Server;
 }
 
 async function start(): Promise<Harness> {
   const provider = new FakeProvider();
   const eligibility = { calls: 0, answer: ELIGIBLE };
-  const archived: VerifiedArtifact[] = [];
+  const evidence = new InMemoryEvidenceStore();
+  const database: { url: string | undefined; probes: number } = { url: undefined, probes: 0 };
+  const clock = { now: AT };
   const documents = new InMemoryDocumentStore();
   const ceremonies = new InMemoryCeremonyLedger();
 
-  const webRoot = await mkdtemp(join(tmpdir(), "signing-demo-"));
+  const webRoot = await mkdtemp(join(tmpdir(), "signing-service-"));
   await writeFile(join(webRoot, "index.html"), "<!doctype html><title>issuer</title>");
   await writeFile(join(webRoot, "sign.html"), "<!doctype html><title>sign</title>");
 
@@ -161,21 +185,44 @@ async function start(): Promise<Harness> {
     instruments: new InMemoryInstrumentStore(),
     documents,
     ceremonies,
-    custody: async (artifact) => {
-      archived.push(artifact);
-    },
+    evidence,
     ids: cryptoInstrumentIds,
     allowedOrigin: ALLOWED_ORIGIN,
     hostedUiOrigin: HOSTED_UI_ORIGIN,
     webhookSecret: undefined,
     webRoot,
+    apiKey: API_KEY,
+    environment: "sandbox",
+    database: () => {
+      database.probes += 1;
+      return probeDatabase(database.url, { timeoutMs: 2_000 });
+    },
+    now: () => clock.now,
   };
 
   const server = createServer(createRouter(deps));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
 
-  return { base: `http://127.0.0.1:${port}`, provider, eligibility, archived, server };
+  return {
+    base: `http://127.0.0.1:${port}`,
+    provider,
+    eligibility,
+    archived: evidence.archived,
+    database,
+    clock,
+    server,
+  };
+}
+
+/** How a call authenticates: the right key unless a test says otherwise. */
+type Auth = "none" | { readonly bearer: string } | { readonly header: string };
+
+function authorization(auth: Auth): Record<string, string> {
+  if (auth === "none") return {};
+  return "bearer" in auth
+    ? { authorization: `Bearer ${auth.bearer}` }
+    : { authorization: auth.header };
 }
 
 async function call(
@@ -183,15 +230,15 @@ async function call(
   method: "GET" | "POST",
   path: string,
   body?: unknown,
+  auth: Auth = { bearer: API_KEY },
 ): Promise<{ readonly status: number; readonly headers: Headers; readonly json: unknown }> {
   const response = await fetch(`${harness.base}${path}`, {
     method,
-    ...(body !== undefined
-      ? {
-          headers: { "content-type": "application/json" },
-          body: typeof body === "string" ? body : JSON.stringify(body),
-        }
-      : {}),
+    headers: {
+      ...authorization(auth),
+      ...(body !== undefined ? { "content-type": "application/json" } : {}),
+    },
+    ...(body !== undefined ? { body: typeof body === "string" ? body : JSON.stringify(body) } : {}),
   });
   const text = await response.text();
   let json: unknown;
@@ -542,19 +589,19 @@ describe("GET /api/sign/{token}/status", () => {
     expect(harness.provider.statusCalls).toEqual(["session-1", "session-1"]);
   });
 
-  it("redacts the token from the error line when the provider read fails", async () => {
+  it("redacts the token and drops the query string from the error line when the provider read fails", async () => {
     const { token } = await createInstrument(harness);
     await handoff(harness, token);
     harness.provider.statusThrows = new Error("UPSTREAM_UNAVAILABLE");
 
-    const { status } = await call(harness, "GET", `/api/sign/${token}/status`);
+    const { status } = await call(harness, "GET", `/api/sign/${token}/status?debug=secret-query`);
 
     expect(status).toBe(500);
     expect(errored).toEqual(["GET /api/sign/…/status -> 500 UPSTREAM_UNAVAILABLE"]);
   });
 });
 
-describe("POST /api/deliveries", () => {
+describe("POST /api/sign/{token}/deliveries", () => {
   it("refuses a delivery naming a document other than the ceremony's, before the core sees it", async () => {
     const { token } = await createInstrument(harness);
     const opened = await handoff(harness, token);
@@ -562,7 +609,7 @@ describe("POST /api/deliveries", () => {
     const { status, json } = await call(
       harness,
       "POST",
-      "/api/deliveries",
+      `/api/sign/${token}/deliveries`,
       deliveryFor(opened, { documentId: "some-other-document" }),
     );
 
@@ -578,19 +625,73 @@ describe("POST /api/deliveries", () => {
     });
   });
 
-  it("refuses a delivery for a ceremony no instrument owns", async () => {
-    const { token } = await createInstrument(harness);
-    const opened = await handoff(harness, token);
+  it("refuses a delivery whose ceremony belongs to another instrument, and archives nothing", async () => {
+    const first = await createInstrument(harness);
+    const firstOpened = await handoff(harness, first.token);
+    const second = await createInstrument(harness, { reference: "ar.pagare/test-2" });
+    await handoff(harness, second.token);
 
+    // The second link, carrying the first instrument's ceremony and document.
     const { status, json } = await call(
       harness,
       "POST",
-      "/api/deliveries",
-      deliveryFor(opened, { ceremonyId: "session-nobody" }),
+      `/api/sign/${second.token}/deliveries`,
+      deliveryFor(firstOpened),
     );
 
+    expect(status).toBe(409);
+    expect(json).toEqual({ error: "ceremony session-1 does not belong to this instrument" });
+    expect(harness.archived).toHaveLength(0);
+    expect((await call(harness, "GET", `/api/sign/${first.token}/status`)).json).toMatchObject({
+      state: "awaiting-signature",
+    });
+  });
+
+  it("refuses a delivery before any ceremony was opened for the link", async () => {
+    const { token } = await createInstrument(harness);
+    const other = await createInstrument(harness, { reference: "ar.pagare/test-2" });
+    const opened = await handoff(harness, other.token);
+
+    const { status } = await call(
+      harness,
+      "POST",
+      `/api/sign/${token}/deliveries`,
+      deliveryFor(opened),
+    );
+
+    expect(status).toBe(409);
+    expect(harness.archived).toHaveLength(0);
+  });
+
+  it("answers 405, not 401, to the wrong verb on a signing route the token does open", async () => {
+    const { token } = await createInstrument(harness);
+
+    const getHandoff = await call(harness, "GET", `/api/sign/${token}/handoff`, undefined, "none");
+    const postStatus = await call(harness, "POST", `/api/sign/${token}/status`, undefined, "none");
+    const getDeliveries = await call(
+      harness,
+      "GET",
+      `/api/sign/${token}/deliveries`,
+      undefined,
+      "none",
+    );
+
+    for (const answer of [getHandoff, postStatus, getDeliveries]) {
+      expect(answer.status).toBe(405);
+      expect(answer.json).toEqual({ error: "method not allowed" });
+    }
+    expect(errored).toEqual([]);
+    expect(harness.provider.opened).toHaveLength(0);
+  });
+
+  it("answers 404 for an unknown token, without reading the body", async () => {
+    const { status, json } = await call(harness, "POST", "/api/sign/not-a-real-token/deliveries", {
+      ceremonyId: "session-1",
+    });
+
     expect(status).toBe(404);
-    expect(json).toEqual({ error: "no instrument for ceremony session-nobody" });
+    expect(json).toEqual({ error: "no such instrument" });
+    expect(everythingLogged()).not.toContain("not-a-real-token");
   });
 
   it("refuses a fileName over the vendor's 180-character cap", async () => {
@@ -600,7 +701,7 @@ describe("POST /api/deliveries", () => {
     const { status, json } = await call(
       harness,
       "POST",
-      "/api/deliveries",
+      `/api/sign/${token}/deliveries`,
       deliveryFor(opened, { fileName: `${"x".repeat(181)}.pdf` }),
     );
 
@@ -615,11 +716,235 @@ describe("POST /api/deliveries", () => {
       deliveryFor(opened, { bytesBase64: "A".repeat(30 * 1024 * 1024) }),
     );
 
-    const { status, json } = await call(harness, "POST", "/api/deliveries", tooLarge);
+    const { status, json } = await call(harness, "POST", `/api/sign/${token}/deliveries`, tooLarge);
 
     expect(status).toBe(413);
     expect((json as ErrorResponse).error).toMatch(/^body must be at most \d+ bytes$/);
     expect(harness.archived).toHaveLength(0);
+  });
+});
+
+describe("the product API key", () => {
+  it("refuses a request with no bearer: 401, a one-word body, and a log line naming only the route", async () => {
+    const { status, json } = await call(
+      harness,
+      "POST",
+      "/api/instruments",
+      instrumentBody(),
+      "none",
+    );
+
+    expect(status).toBe(401);
+    expect(json).toEqual({ error: "unauthorized" });
+    expect(errored).toEqual(["401 POST /api/instruments"]);
+    expect(harness.provider.opened).toHaveLength(0);
+  });
+
+  it("refuses a wrong key of the same length", async () => {
+    const wrong = API_KEY.replace(/.$/, (last) => (last === "f" ? "0" : "f"));
+    expect(wrong).toHaveLength(API_KEY.length);
+
+    const { status, json } = await call(harness, "POST", "/api/instruments", instrumentBody(), {
+      bearer: wrong,
+    });
+
+    expect(status).toBe(401);
+    expect(json).toEqual({ error: "unauthorized" });
+  });
+
+  it("refuses a wrong key of a different length without throwing", async () => {
+    const shorter = await call(harness, "POST", "/api/instruments", instrumentBody(), {
+      bearer: "short",
+    });
+    const longer = await call(harness, "POST", "/api/instruments", instrumentBody(), {
+      bearer: `${API_KEY}-and-more`,
+    });
+
+    expect(shorter.status).toBe(401);
+    expect(longer.status).toBe(401);
+    expect(errored).toEqual(["401 POST /api/instruments", "401 POST /api/instruments"]);
+  });
+
+  it("refuses a malformed Authorization header", async () => {
+    for (const header of [
+      "Basic dXNlcjpwYXNz",
+      `Token ${API_KEY}`,
+      "Bearer",
+      `Bearer ${API_KEY} x`,
+    ]) {
+      const { status } = await call(harness, "POST", "/api/eligibility", instrumentBody(), {
+        header,
+      });
+      expect(status).toBe(401);
+    }
+    expect(harness.eligibility.calls).toBe(0);
+  });
+
+  it("runs the route with the right key, and the key appears in no log line either way", async () => {
+    await call(harness, "POST", "/api/instruments", instrumentBody(), "none");
+    const { status, token } = await createInstrument(harness);
+
+    expect(status).toBe(201);
+    expect(everythingLogged()).not.toContain(API_KEY);
+    expect(everythingLogged()).not.toContain(token);
+  });
+
+  it("guards eligibility and every GET under /api/instruments/, and redacts nothing it need not", async () => {
+    const { created } = await createInstrument(harness);
+
+    for (const [method, path] of [
+      ["POST", "/api/eligibility"],
+      ["GET", `/api/instruments/${created.instrumentId}`],
+      ["GET", `/api/instruments/${created.instrumentId}/document`],
+      ["GET", `/api/instruments/${created.instrumentId}/artifact`],
+    ] as const) {
+      errored = [];
+      const { status } = await call(harness, method, path, undefined, "none");
+      expect(status).toBe(401);
+      expect(errored).toEqual([`401 ${method} ${path}`]);
+    }
+  });
+
+  it("asks nothing of the pages, the signing routes, the webhook or the health check", async () => {
+    const { token } = await createInstrument(harness);
+
+    expect((await call(harness, "GET", "/", undefined, "none")).status).toBe(200);
+    expect((await call(harness, "GET", `/sign/${token}`, undefined, "none")).status).toBe(200);
+    expect((await call(harness, "GET", "/health", undefined, "none")).status).toBe(200);
+    expect(
+      (await call(harness, "GET", `/api/sign/${token}/status`, undefined, "none")).json,
+    ).toEqual({ state: "awaiting-signature" });
+    expect(
+      (await call(harness, "POST", `/api/sign/${token}/handoff`, undefined, "none")).status,
+    ).toBe(200);
+    // No secret is configured, so the webhook fails closed with 503 — not 401.
+    expect((await call(harness, "POST", "/api/webhooks/lakaut", "{}", "none")).status).toBe(503);
+    expect(errored.filter((line) => line.startsWith("401"))).toEqual([]);
+  });
+});
+
+describe("GET /api/instruments/{id}", () => {
+  it("returns the instrument as the product sees it, with the same link and no token elsewhere", async () => {
+    const { created } = await createInstrument(harness);
+
+    const { status, json } = await call(harness, "GET", `/api/instruments/${created.instrumentId}`);
+
+    expect(status).toBe(200);
+    expect(json).toEqual({
+      instrumentId: created.instrumentId,
+      reference: "ar.pagare/test-1",
+      documentId: created.documentId,
+      state: "awaiting-signature",
+      signingUrl: created.signingUrl,
+    } satisfies InstrumentResponse);
+  });
+
+  it("answers 404 for an id nobody minted", async () => {
+    const { status, json } = await call(harness, "GET", "/api/instruments/not-an-id");
+
+    expect(status).toBe(404);
+    expect(json).toEqual({ error: "no such instrument" });
+  });
+
+  it("serves the sealed PDF under /document", async () => {
+    const { created } = await createInstrument(harness);
+
+    const response = await fetch(
+      `${harness.base}/api/instruments/${created.instrumentId}/document`,
+      { headers: authorization({ bearer: API_KEY }) },
+    );
+    const bytes = new Uint8Array(await response.arrayBuffer());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("application/pdf");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(Buffer.from(bytes.subarray(0, 5)).toString("latin1")).toBe("%PDF-");
+  });
+
+  it("serves the signed PDF under /artifact only once a verified copy is in custody", async () => {
+    const { created, token } = await createInstrument(harness);
+    const opened = await handoff(harness, token);
+    const artifactUrl = `${harness.base}/api/instruments/${created.instrumentId}/artifact`;
+    const headers = authorization({ bearer: API_KEY });
+
+    const before = await fetch(artifactUrl, { headers });
+    expect(before.status).toBe(404);
+    expect(await before.json()).toEqual({ error: "not signed yet" });
+
+    const signedBytes = Buffer.from("%PDF-1.7 signed copy");
+    await call(
+      harness,
+      "POST",
+      `/api/sign/${token}/deliveries`,
+      deliveryFor(opened, { bytesBase64: signedBytes.toString("base64") }),
+    );
+
+    const after = await fetch(artifactUrl, { headers });
+    expect(after.status).toBe(200);
+    expect(after.headers.get("content-type")).toBe("application/pdf");
+    expect(Buffer.from(await after.arrayBuffer())).toEqual(signedBytes);
+    expect(
+      (await call(harness, "GET", `/api/instruments/${created.instrumentId}`)).json,
+    ).toMatchObject({ state: "signed" });
+  });
+});
+
+describe("GET /health", () => {
+  it("probes the database once per ten-second window, however many requests arrive", async () => {
+    harness.database.url = "postgres://app:not-a-real-password@127.0.0.1:1/app";
+
+    await Promise.all([
+      call(harness, "GET", "/health", undefined, "none"),
+      call(harness, "GET", "/health", undefined, "none"),
+    ]);
+    await call(harness, "GET", "/health", undefined, "none");
+    expect(harness.database.probes).toBe(1);
+
+    harness.clock.now = new Date(AT.getTime() + 9_999);
+    await call(harness, "GET", "/health", undefined, "none");
+    expect(harness.database.probes).toBe(1);
+
+    harness.clock.now = new Date(AT.getTime() + 10_000);
+    const { json } = await call(harness, "GET", "/health", undefined, "none");
+    expect(harness.database.probes).toBe(2);
+    expect(json).toMatchObject({ ok: true, database: "unreachable" });
+  });
+
+  it("reports the environment and an unconfigured database when there is no URL", async () => {
+    const { status, json } = await call(harness, "GET", "/health", undefined, "none");
+
+    expect(status).toBe(200);
+    expect(json).toEqual({
+      ok: true,
+      environment: "sandbox",
+      database: "unconfigured",
+    } satisfies HealthResponse);
+  });
+
+  it("reports unreachable for a closed port, and reachable for an open one, naming neither", async () => {
+    const probe = createServer();
+    await new Promise<void>((resolve) => probe.listen(0, "127.0.0.1", resolve));
+    const closed = (probe.address() as AddressInfo).port;
+    await new Promise<void>((resolve, reject) =>
+      probe.close((error) => (error === undefined ? resolve() : reject(error))),
+    );
+    harness.database.url = `postgres://app:${DATABASE_PASSWORD}@127.0.0.1:${closed}/app`;
+
+    const unreachable = await call(harness, "GET", "/health", undefined, "none");
+    expect(unreachable.json).toMatchObject({ ok: true, database: "unreachable" });
+
+    // The harness's own listener accepts TCP; that is all the probe asks. The
+    // clock moves past the window first, or the cached answer would be reused.
+    const open = new URL(harness.base).port;
+    harness.database.url = `postgres://app:${DATABASE_PASSWORD}@127.0.0.1:${open}/app`;
+    harness.clock.now = new Date(AT.getTime() + 10_000);
+
+    const reachable = await call(harness, "GET", "/health", undefined, "none");
+    expect(reachable.json).toMatchObject({ ok: true, database: "reachable" });
+
+    expect(JSON.stringify([unreachable.json, reachable.json])).not.toContain(DATABASE_PASSWORD);
+    expect(everythingLogged()).not.toContain(DATABASE_PASSWORD);
+    expect(everythingLogged()).not.toContain("127.0.0.1");
   });
 });
 
@@ -656,13 +981,17 @@ describe("create → handoff → deliver", () => {
     const opened = await handoff(harness, token);
     const { documentId, bytesBase64 } = opened.document;
 
-    const delivered = await call(harness, "POST", "/api/deliveries", deliveryFor(opened));
+    const delivered = await call(
+      harness,
+      "POST",
+      `/api/sign/${token}/deliveries`,
+      deliveryFor(opened),
+    );
 
     expect(delivered.status).toBe(200);
     expect(delivered.json).toEqual({
       documentId,
       verifiedAt: AT.toISOString(),
-      archivedTo: `evidence/${documentId}.pdf`,
     });
     expect(harness.archived.map((artifact) => artifact.documentId)).toEqual([documentId]);
 
@@ -681,6 +1010,7 @@ describe("create → handoff → deliver", () => {
     expect(output).toContain(`instrumentId=${created.instrumentId}`);
     expect(output).not.toContain(token);
     expect(output).not.toContain(CLIENT_TOKEN);
+    expect(output).not.toContain(API_KEY);
     expect(output).not.toContain("hostedUiOrigin");
     expect(output).not.toContain(SIGNER_EMAIL);
     expect(output).not.toContain(SIGNER_PHONE);
@@ -718,7 +1048,7 @@ describe("the signing page's lines", () => {
       unknownError: "desconocido",
       statusUnreadable: "no se pudo leer el estado:",
       authoritativeState: "estado autoritativo:",
-      archivedAt: "verificado y archivado en",
+      archived: "verificado y archivado",
     });
     expect(Object.isFrozen(STATUS_LINES)).toBe(true);
     expect(Object.isFrozen(DETAIL_LINES)).toBe(true);

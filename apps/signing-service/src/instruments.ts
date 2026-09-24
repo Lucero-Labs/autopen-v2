@@ -1,7 +1,7 @@
 /**
  * Instruments: what an issuer creates, and what a signing link points at.
  *
- * An instrument is the demo's unit of work above the core's document and
+ * An instrument is the service's unit of work above the core's document and
  * ceremony. It carries the one thing the core does not: the link token. The
  * token is the whole credential for the signing page — whoever holds it can
  * open the ceremony — so it is treated like the handoff it unlocks: generated
@@ -15,6 +15,8 @@ import { randomBytes, randomUUID } from "node:crypto";
 
 import type { CeremonyHandoff, CeremonyId, DocumentId } from "@autopen/core";
 
+import type { InstrumentState } from "./wire.ts";
+
 /** The signer's contact details, as the issuer supplied them. Pre-fills only. */
 export interface InstrumentSigner {
   readonly email: string;
@@ -27,16 +29,7 @@ export interface InstrumentCeremony {
   readonly handoff: CeremonyHandoff;
 }
 
-/**
- * Whether the demo holds a verified signed copy.
- *
- * Two values only, and `signed` is set exclusively after `ingest` resolves:
- * the browser saying the flow completed, or the provider saying the session
- * completed, are both still `awaiting-signature` here (STYLES §9.1).
- */
-export type InstrumentState = "awaiting-signature" | "signed";
-
-/** One sealed document, one signer, one link. */
+/** One sealed document, one signer, one link. Its `state` is `InstrumentState`, which crosses the wire. */
 export interface Instrument {
   readonly instrumentId: string;
   /** The link's only content. Never logged, never returned except inside the link. */
@@ -77,6 +70,7 @@ export const cryptoInstrumentIds: InstrumentIds = Object.freeze({
  */
 export interface InstrumentStore {
   put(instrument: Instrument): Promise<void>;
+  findById(instrumentId: string): Promise<Instrument | undefined>;
   findByToken(token: string): Promise<Instrument | undefined>;
   findByReference(reference: string): Promise<Instrument | undefined>;
   findByCeremony(ceremonyId: CeremonyId): Promise<Instrument | undefined>;
@@ -93,8 +87,9 @@ export class InstrumentImmutableError extends Error {
   }
 }
 
-/** Instruments held in Maps, reachable by token, by reference and by ceremony. */
+/** Instruments held in Maps, reachable by id, by token, by reference and by ceremony. */
 export class InMemoryInstrumentStore implements InstrumentStore {
+  readonly #byId = new Map<string, Instrument>();
   readonly #byToken = new Map<string, Instrument>();
   readonly #byReference = new Map<string, Instrument>();
   readonly #byCeremony = new Map<CeremonyId, Instrument>();
@@ -127,11 +122,18 @@ export class InMemoryInstrumentStore implements InstrumentStore {
         throw new InstrumentImmutableError(stored.instrumentId, "ceremony");
       }
     }
+    this.#byId.set(instrument.instrumentId, instrument);
     this.#byToken.set(instrument.token, instrument);
     this.#byReference.set(instrument.reference, instrument);
     if (instrument.ceremony !== undefined) {
       this.#byCeremony.set(instrument.ceremony.ceremonyId, instrument);
     }
+  }
+
+  /** The instrument an issuer holds the public identifier of, if any. */
+  async findById(instrumentId: string): Promise<Instrument | undefined> {
+    await Promise.resolve();
+    return this.#byId.get(instrumentId);
   }
 
   /** The instrument a link token opens, if any. */

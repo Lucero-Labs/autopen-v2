@@ -1,0 +1,24 @@
+# What the Dockerfile must not see. Generated output is rebuilt inside the
+# image; credentials and evidence never enter a build context at all.
+.git
+.github
+.claude
+.turbo
+**/.turbo
+node_modules
+**/node_modules
+dist
+**/dist
+**/dist-browser
+apps/signing-service/web/client.js
+apps/signing-service/web/sign.js
+coverage
+**/coverage
+evidence
+**/evidence
+.env
+.env.*
+.npmrc
+docs
+*.log
+.DS_Store

@@ -40,10 +40,10 @@ packages/rules-pagare-ar/  the Argentine pagaré rule set, registered with the g
 docs/product/              the pagaré product's prototype and brief
 ```
 
-And a demo:
+And the service:
 
 ```
-apps/signing-demo/         runs the whole spine against preproduction from a page
+apps/signing-service/      the API products call and the page signers open; deploys as one container
 ```
 
 The spine is `seal → openCeremony → ingest → reconcile`, with

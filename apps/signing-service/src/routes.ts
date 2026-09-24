@@ -1,5 +1,5 @@
 /**
- * The demo's HTTP surface, built from its dependencies rather than from the
+ * The service's HTTP surface, built from its dependencies rather than from the
  * environment.
  *
  * Two pages sit on it. The issuer's page (`/`) creates an instrument and gets a
@@ -9,12 +9,18 @@
  * factors that journey allows. Nothing the signer's browser sends chooses a
  * journey (`sdk-integracion__seguridad.md`, "Protección de endpoints propios").
  *
+ * A product reaches the instrument routes with one API key, sent as a bearer
+ * token. The pages and the webhook carry their own credentials — the link
+ * token, the HMAC — and need no key. The key is a backend secret: a product
+ * that uses it from a browser has leaked it.
+ *
  * Everything the router cannot determine — the core, the eligibility read, the
- * custody sink, the identifiers — arrives as a parameter, so the whole surface
- * runs in a test against a fake provider (STYLES §10). `server.ts` is the only
- * place that reads the environment.
+ * evidence store, the identifiers, the key — arrives as a parameter, so the
+ * whole surface runs in a test against a fake provider (STYLES §10).
+ * `server.ts` is the only place that reads the environment.
  */
 
+import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
@@ -26,7 +32,6 @@ import {
   type CeremonyPlan,
   type CeremonyStatus,
   type ContentHash,
-  type CustodySink,
   deriveDocumentId,
   type DocumentId,
   type DocumentStore,
@@ -44,12 +49,16 @@ import {
   type WebhookChallengeReply,
 } from "@autopen/adapter-lakaut";
 
+import type { EvidenceStore } from "./evidence.ts";
+import type { DatabaseProbe } from "./health.ts";
 import type { Instrument, InstrumentIds, InstrumentStore } from "./instruments.ts";
 import { renderPagare } from "./pagare.ts";
 import type {
+  DatabaseReachability,
   DeliveryResponse,
   ErrorResponse,
   HandoffResponse,
+  HealthResponse,
   InstrumentResponse,
   SigningStatus,
   StatusResponse,
@@ -70,9 +79,17 @@ export interface RouterDependencies {
   readonly documents: DocumentStore;
   /** For webhook idempotency only; ceremonies themselves go through `core`. */
   readonly ceremonies: CeremonyLedger;
-  /** Runs between verification and binding. Rejecting cancels the binding (§9.5). */
-  readonly custody: CustodySink;
+  /** Archives between verification and binding — rejecting cancels the binding (§9.5) — and serves the artefact. */
+  readonly evidence: EvidenceStore;
   readonly ids: InstrumentIds;
+  /** Required, as `Authorization: Bearer <key>`, on every product-facing route. Never logged. */
+  readonly apiKey: string;
+  /** Reported by `/health` so a deployment says which Lakaut environment it talks to. */
+  readonly environment: string;
+  /** Reported by `/health`; the probe, not the URL, so the router never holds a database credential. */
+  readonly database: DatabaseProbe;
+  /** The clock the health probe's window is measured on. Injected so a test can move it (STYLES §4). */
+  readonly now: () => Date;
   /** The origin the signing link is minted under. Also the session's `allowedOrigin`. */
   readonly allowedOrigin: string;
   /** Allow-listed by the signing page's CSP; every handoff is checked against it. */
@@ -95,6 +112,15 @@ const MAX_BODY_BYTES: number = Math.ceil((LAKAUT_MAX_DOCUMENT_BYTES * 4) / 3) + 
 /** The vendor's cap on `fileName` (`sdk-integracion__documentos-firma.md`, "Validaciones del documento"). */
 const MAX_FILE_NAME_CHARS = 180;
 
+/**
+ * How long one database probe answers for.
+ *
+ * `/health` is unauthenticated, so without a window every anonymous request
+ * would open a connection to the database host. Ten seconds is shorter than
+ * any platform's check interval and long enough that a burst costs one probe.
+ */
+const HEALTH_PROBE_WINDOW_MS = 10_000;
+
 /** What `POST /api/instruments` accepts. The journey and factors are not the issuer's to choose. */
 interface CreateInstrumentRequest {
   readonly email: string;
@@ -112,6 +138,9 @@ interface DeliveryRequest {
   readonly finalPdfHash: string;
   readonly signedAt: string;
 }
+
+/** What a product asks for under `/api/instruments/{id}`: the record, the sealed PDF, or the signed one. */
+type InstrumentPart = "instrument" | "document" | "artifact";
 
 /**
  * A refusal with the status it deserves, as opposed to a bug, which is a 500.
@@ -209,16 +238,51 @@ function redactPath(pathname: string): string {
   return pathname.replace(/^(\/(?:api\/)?sign)\/[^/]+/, "$1/…");
 }
 
+/** The request's path without its query string, for a log line; the host is irrelevant to it. */
+function pathnameOf(request: IncomingMessage): string {
+  return new URL(request.url ?? "/", "http://localhost").pathname;
+}
+
 /** The token between `/api/sign/` and the action, or `undefined` for any other path. */
 function signRoute(
   pathname: string,
 ): { readonly token: string; readonly action: string } | undefined {
-  const match = /^\/api\/sign\/([^/]+)\/(handoff|status)$/.exec(pathname);
+  const match = /^\/api\/sign\/([^/]+)\/(handoff|status|deliveries)$/.exec(pathname);
   if (match === null) return undefined;
   const token = match[1];
   const action = match[2];
   if (token === undefined || action === undefined) return undefined;
   return { token, action };
+}
+
+/** The id and part of a `/api/instruments/{id}[/document|/artifact]` path, or `undefined` for any other. */
+function instrumentRoute(
+  pathname: string,
+): { readonly instrumentId: string; readonly part: InstrumentPart } | undefined {
+  const match = /^\/api\/instruments\/([^/]+)(?:\/(document|artifact))?$/.exec(pathname);
+  if (match === null) return undefined;
+  const instrumentId = match[1];
+  if (instrumentId === undefined) return undefined;
+  const part = match[2];
+  return { instrumentId, part: part === "document" || part === "artifact" ? part : "instrument" };
+}
+
+/**
+ * Whether the request carries the product API key as `Authorization: Bearer <key>`.
+ *
+ * Compared in constant time once the lengths agree, and refused outright when
+ * they do not: `timingSafeEqual` throws on unequal lengths, so the length check
+ * is what keeps a wrong key of the wrong length from being a 500. Nothing
+ * about the presented value is kept or logged (STYLES §8.1).
+ */
+function presentsApiKey(request: IncomingMessage, apiKey: string): boolean {
+  const header = request.headers.authorization;
+  if (typeof header !== "string") return false;
+  const presented = /^Bearer (\S+)$/.exec(header)?.[1];
+  if (presented === undefined) return false;
+  const expected = Buffer.from(apiKey);
+  const given = Buffer.from(presented);
+  return given.byteLength === expected.byteLength && timingSafeEqual(given, expected);
 }
 
 /**
@@ -282,6 +346,17 @@ function json(response: ServerResponse, status: number, payload: unknown): void 
       "cache-control": "no-store",
     })
     .end(JSON.stringify(payload));
+}
+
+/** A PDF, whole, with the same no-cache rule as every other answer here. */
+function pdf(response: ServerResponse, bytes: Uint8Array): void {
+  response
+    .writeHead(200, {
+      "content-type": "application/pdf",
+      "content-length": String(bytes.byteLength),
+      "cache-control": "no-store",
+    })
+    .end(bytes);
 }
 
 /**
@@ -415,6 +490,9 @@ export function createRouter(deps: RouterDependencies): RequestListener {
   const { core, instruments, ceremonies } = deps;
   const creating = new Map<string, Promise<{ status: number; instrument: Instrument }>>();
   const handingOff = new Map<string, Promise<HandoffResponse | StatusResponse>>();
+  let lastProbe:
+    | { readonly at: number; readonly result: Promise<DatabaseReachability> }
+    | undefined;
 
   /**
    * Refuses a handoff whose Hosted UI origin is not the one the page allows.
@@ -523,7 +601,72 @@ export function createRouter(deps: RouterDependencies): RequestListener {
   function toInstrumentResponse(instrument: Instrument): InstrumentResponse {
     return Object.freeze({
       instrumentId: instrument.instrumentId,
+      reference: instrument.reference,
+      documentId: instrument.documentId,
+      state: instrument.state,
       signingUrl: `${deps.allowedOrigin}/sign/${instrument.token}`,
+    });
+  }
+
+  /** The instrument a product asked for by id, or a 404 that says no more than that. */
+  async function findInstrument(instrumentId: string): Promise<Instrument> {
+    const instrument = await instruments.findById(instrumentId);
+    if (instrument === undefined) throw new RefusedError(404, "no such instrument");
+    return instrument;
+  }
+
+  /** The sealed, unsigned PDF: what the signer is shown. */
+  async function sealedBytes(instrument: Instrument): Promise<Uint8Array> {
+    const sealed = await deps.documents.get(instrument.documentId);
+    if (sealed === undefined) {
+      // An instrument is only ever stored after its seal; losing the document
+      // is a bug in the store, never a state the caller should reason about.
+      throw new Error(`document ${instrument.documentId} is not sealed`);
+    }
+    return sealed.bytes;
+  }
+
+  /**
+   * The signed PDF, once there is one.
+   *
+   * `signed` is written only after custody, so a signed instrument whose copy
+   * cannot be read is a broken store, not a pending signature: a 500, never a
+   * 404 that a product would read as "not yet".
+   */
+  async function signedBytes(instrument: Instrument): Promise<Uint8Array> {
+    if (instrument.state !== "signed") throw new RefusedError(404, "not signed yet");
+    const bytes = await deps.evidence.readArtifact(instrument.documentId);
+    if (bytes === undefined) {
+      throw new Error(
+        `instrument ${instrument.instrumentId} is signed but document ` +
+          `${instrument.documentId} is not in custody`,
+      );
+    }
+    return bytes;
+  }
+
+  /**
+   * The database probe's answer, reused within `HEALTH_PROBE_WINDOW_MS`.
+   *
+   * The promise is cached, not the value, so requests that arrive while the
+   * first probe is still connecting share it rather than each opening a socket.
+   */
+  function databaseReachability(): Promise<DatabaseReachability> {
+    const at = deps.now().getTime();
+    if (lastProbe !== undefined && at - lastProbe.at < HEALTH_PROBE_WINDOW_MS) {
+      return lastProbe.result;
+    }
+    const result = deps.database();
+    lastProbe = { at, result };
+    return result;
+  }
+
+  /** What an unauthenticated caller may know: the process is up, which environment it is, and whether the database answers. */
+  async function health(): Promise<HealthResponse> {
+    return Object.freeze({
+      ok: true as const,
+      environment: deps.environment,
+      database: await databaseReachability(),
     });
   }
 
@@ -627,14 +770,37 @@ export function createRouter(deps: RouterDependencies): RequestListener {
    * Verifies the delivered copy, archives it, and only then marks the
    * instrument signed.
    *
+   * The link token chose the instrument; the body must then name that
+   * instrument's ceremony and document, or it is refused before the core sees
+   * it. The core checks the same thing against the ledger and would throw;
+   * here it is a 409 the caller can act on, and a body cannot steer a copy
+   * onto a ceremony the link does not own.
+   *
    * The custody sink runs inside `ingest`, before the binding (STYLES §9.5).
    * The state change here is after both, so `signed` is never observed for
-   * an instrument whose copy is not in custody. A delivery naming a document
-   * other than the instrument's is refused before the core sees it — the core
-   * checks the same thing against the ledger, and would throw; here it is a
-   * 409 the caller can act on.
+   * an instrument whose copy is not in custody.
    */
-  async function ingestDelivery(request: DeliveryRequest): Promise<DeliveryResponse> {
+  async function ingestDelivery(
+    instrument: Instrument,
+    request: DeliveryRequest,
+  ): Promise<DeliveryResponse> {
+    if (
+      instrument.ceremony === undefined ||
+      instrument.ceremony.ceremonyId !== request.ceremonyId
+    ) {
+      throw new RefusedError(
+        409,
+        `ceremony ${request.ceremonyId} does not belong to this instrument`,
+      );
+    }
+    if (instrument.documentId !== request.documentId) {
+      throw new RefusedError(
+        409,
+        `ceremony ${request.ceremonyId} was opened for document ${instrument.documentId}, ` +
+          `not ${request.documentId}`,
+      );
+    }
+
     const delivery: SignedDelivery = {
       ceremonyId: request.ceremonyId as CeremonyId,
       documentId: request.documentId as DocumentId,
@@ -645,19 +811,7 @@ export function createRouter(deps: RouterDependencies): RequestListener {
       signedAt: request.signedAt,
     };
 
-    const instrument = await instruments.findByCeremony(delivery.ceremonyId);
-    if (instrument === undefined) {
-      throw new RefusedError(404, `no instrument for ceremony ${delivery.ceremonyId}`);
-    }
-    if (instrument.documentId !== delivery.documentId) {
-      throw new RefusedError(
-        409,
-        `ceremony ${delivery.ceremonyId} was opened for document ${instrument.documentId}, ` +
-          `not ${delivery.documentId}`,
-      );
-    }
-
-    const verified = await core.ingest(delivery, deps.custody);
+    const verified = await core.ingest(delivery, (artifact) => deps.evidence.archive(artifact));
     await instruments.put(Object.freeze({ ...instrument, state: "signed" }));
 
     console.log(
@@ -668,7 +822,6 @@ export function createRouter(deps: RouterDependencies): RequestListener {
     return Object.freeze({
       documentId: verified.documentId,
       verifiedAt: verified.verifiedAt,
-      archivedTo: `evidence/${verified.documentId}.pdf`,
     });
   }
 
@@ -743,6 +896,11 @@ export function createRouter(deps: RouterDependencies): RequestListener {
   async function route(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
 
+    if (request.method === "GET" && url.pathname === "/health") {
+      json(response, 200, await health());
+      return;
+    }
+
     if (request.method === "GET" && !url.pathname.startsWith("/api/")) {
       await serveStatic(url.pathname, response);
       return;
@@ -750,6 +908,44 @@ export function createRouter(deps: RouterDependencies): RequestListener {
 
     if (request.method === "POST" && url.pathname === "/api/webhooks/lakaut") {
       await handleWebhook(request, response, await readRaw(request));
+      return;
+    }
+
+    const sign = signRoute(url.pathname);
+    if (sign !== undefined) {
+      const instrument = await instruments.findByToken(sign.token);
+      if (instrument === undefined) {
+        // Same answer whether the token never existed or the process forgot
+        // it, and no log line: the token is the credential (STYLES §8.1).
+        json(response, 404, { error: "no such instrument" } satisfies ErrorResponse);
+        return;
+      }
+      if (request.method === "POST" && sign.action === "handoff") {
+        json(response, 200, await handoff(instrument));
+        return;
+      }
+      if (request.method === "GET" && sign.action === "status") {
+        json(response, 200, await status(instrument));
+        return;
+      }
+      if (request.method === "POST" && sign.action === "deliveries") {
+        const delivery = toDeliveryRequest(await readBody(request));
+        json(response, 200, await ingestDelivery(instrument, delivery));
+        return;
+      }
+      // A known signing route with the wrong verb is answered here, not by
+      // the key gate below: the token was valid, so 401 would be a lie.
+      json(response, 405, { error: "method not allowed" } satisfies ErrorResponse);
+      return;
+    }
+
+    // Everything left under `/api/` is product-facing. Refused before any
+    // body is read, with one word in the answer and only the route in the
+    // log: a caller without the key learns that it needs one, and no more.
+    if (!presentsApiKey(request, deps.apiKey)) {
+      console.error(`401 ${request.method} ${redactPath(url.pathname)}`);
+      request.resume();
+      json(response, 401, { error: "unauthorized" } satisfies ErrorResponse);
       return;
     }
 
@@ -782,28 +978,20 @@ export function createRouter(deps: RouterDependencies): RequestListener {
       return;
     }
 
-    const sign = signRoute(url.pathname);
-    if (sign !== undefined) {
-      const instrument = await instruments.findByToken(sign.token);
-      if (instrument === undefined) {
-        // Same answer whether the token never existed or the process forgot
-        // it, and no log line: the token is the credential (STYLES §8.1).
-        json(response, 404, { error: "no such instrument" } satisfies ErrorResponse);
-        return;
+    const product = instrumentRoute(url.pathname);
+    if (request.method === "GET" && product !== undefined) {
+      const instrument = await findInstrument(product.instrumentId);
+      switch (product.part) {
+        case "instrument":
+          json(response, 200, toInstrumentResponse(instrument));
+          return;
+        case "document":
+          pdf(response, await sealedBytes(instrument));
+          return;
+        case "artifact":
+          pdf(response, await signedBytes(instrument));
+          return;
       }
-      if (request.method === "POST" && sign.action === "handoff") {
-        json(response, 200, await handoff(instrument));
-        return;
-      }
-      if (request.method === "GET" && sign.action === "status") {
-        json(response, 200, await status(instrument));
-        return;
-      }
-    }
-
-    if (request.method === "POST" && url.pathname === "/api/deliveries") {
-      json(response, 200, await ingestDelivery(toDeliveryRequest(await readBody(request))));
-      return;
     }
 
     json(response, 404, { error: "no such route" } satisfies ErrorResponse);
@@ -813,10 +1001,11 @@ export function createRouter(deps: RouterDependencies): RequestListener {
     route(request, response).catch((error: unknown) => {
       const message = describe(error);
       const status = error instanceof RefusedError ? error.status : 500;
-      // The path is redacted before it is printed; the message may name an
-      // error code or a configured origin, which is for this log and not for
-      // the anonymous caller (§8.1).
-      console.error(`${request.method} ${redactPath(request.url ?? "/")} -> ${status} ${message}`);
+      // The path is redacted before it is printed, and the query string is
+      // not printed at all, as on the 401 line; the message may name an error
+      // code or a configured origin, which is for this log and not for the
+      // anonymous caller (§8.1).
+      console.error(`${request.method} ${redactPath(pathnameOf(request))} -> ${status} ${message}`);
       if (response.headersSent) return;
 
       // A refusal explains itself. A failure does not: its message may name a
