@@ -2,9 +2,8 @@
  * The health check's one live probe: whether the database host answers on its port.
  *
  * A TCP connect and nothing more — no client library, no SQL, no credential
- * sent — because this deployment proves that the wiring reaches the database,
- * not that queries run. The URL is parsed for its host and port and never
- * printed or returned: it carries the password (STYLES §8.1).
+ * sent. The URL is parsed for its host and port and never printed or
+ * returned: it carries the password (STYLES §8.1).
  */
 
 import { createConnection } from "node:net";
@@ -21,9 +20,9 @@ export type DatabaseProbe = () => Promise<DatabaseReachability>;
  * Opens a TCP connection to the URL's host and port, closes it, and says whether it opened.
  *
  * `unconfigured` when there is no URL; `unreachable` when the URL cannot be
- * parsed, is refused, or does not answer within `timeoutMs`. A URL that cannot
- * be parsed is reported as unreachable rather than thrown: the health route
- * must answer, and its answer must not contain the value that failed to parse.
+ * parsed, is refused, or does not answer within `timeoutMs`. A bad URL is
+ * reported rather than thrown: the health route must answer, and its answer
+ * must not contain the value that failed to parse.
  */
 export function probeDatabase(
   url: string | undefined,

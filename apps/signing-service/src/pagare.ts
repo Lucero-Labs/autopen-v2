@@ -1,15 +1,10 @@
 /**
  * A minimal, deterministic pagaré PDF, built without a rendering library.
  *
- * This is a *stand-in*, not the instrument. The real renderer belongs to
- * `draft` (RESULT-001 §2.2, operation 1) and has to satisfy the pagaré's legal
- * requisites; this one exists so the signing spine has real PDF bytes to seal
- * and a ceremony has something to display.
- *
- * It is byte-identical for identical inputs, which is the property that makes
- * the content hash mean anything: no clock reaches these bytes, the object
- * order is fixed, and the cross-reference offsets are measured from the output
- * rather than assumed (STYLES §7.2).
+ * A stand-in, not the instrument: the real renderer belongs to `draft`
+ * (RESULT-001 §2.2, operation 1). Byte-identical for identical inputs — no
+ * clock reaches these bytes, the object order is fixed, and the cross-reference
+ * offsets are measured from the output rather than assumed (STYLES §7.2).
  */
 
 const ENCODER = new TextEncoder();
@@ -60,10 +55,8 @@ function contentStream(draft: PagareDraft): string {
 /**
  * Assembles the file, measuring each object's byte offset as it goes.
  *
- * The cross-reference table has to state where every object starts, so the
- * objects are serialised first and the table is written from what was actually
- * emitted. Computing the offsets any other way is how a PDF ends up structurally
- * invalid in a way no viewer reports consistently.
+ * The cross-reference table states where every object starts, so the objects
+ * are serialised first and the table written from what was actually emitted.
  */
 export function renderPagare(draft: PagareDraft): Uint8Array {
   const stream = contentStream(draft);

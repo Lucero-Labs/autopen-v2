@@ -1019,8 +1019,6 @@ describe("create → handoff → deliver", () => {
   });
 
   it("would catch a logged object, not only a logged string", () => {
-    // The capture must render objects the way Node's console does, or a
-    // `console.log("x", handoff)` would land as `[object Object]` and pass.
     console.log("handoff", { context: { clientToken: CLIENT_TOKEN } });
 
     expect(everythingLogged()).toContain(CLIENT_TOKEN);

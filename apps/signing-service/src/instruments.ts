@@ -1,14 +1,10 @@
 /**
  * Instruments: what an issuer creates, and what a signing link points at.
  *
- * An instrument is the service's unit of work above the core's document and
- * ceremony. It carries the one thing the core does not: the link token. The
- * token is the whole credential for the signing page — whoever holds it can
- * open the ceremony — so it is treated like the handoff it unlocks: generated
- * from the OS entropy source, never logged, never derived from anything a
- * third party could guess (STYLES §8.1).
- *
- * In memory, like every other store in this app. Restarting forgets every link.
+ * An instrument carries the one thing the core does not: the link token. The
+ * token is the whole credential for the signing page, so it is generated from
+ * the OS entropy source and never logged (STYLES §8.1). In memory, like every
+ * other store in this app.
  */
 
 import { randomBytes, randomUUID } from "node:crypto";
@@ -29,7 +25,7 @@ export interface InstrumentCeremony {
   readonly handoff: CeremonyHandoff;
 }
 
-/** One sealed document, one signer, one link. Its `state` is `InstrumentState`, which crosses the wire. */
+/** One sealed document, one signer, one link. */
 export interface Instrument {
   readonly instrumentId: string;
   /** The link's only content. Never logged, never returned except inside the link. */
@@ -49,25 +45,13 @@ export interface InstrumentIds {
   instrumentId(): string;
 }
 
-/**
- * Identifiers from `node:crypto`: a 32-byte base64url token and a UUID.
- *
- * 32 bytes is 256 bits, which is more than the handoff's own token carries, and
- * base64url keeps it path-safe without percent-encoding — 43 characters, no
- * padding.
- */
+/** Identifiers from `node:crypto`: a 32-byte token, base64url so it is path-safe, and a UUID. */
 export const cryptoInstrumentIds: InstrumentIds = Object.freeze({
   token: () => randomBytes(32).toString("base64url"),
   instrumentId: () => randomUUID(),
 });
 
-/**
- * Where instruments live.
- *
- * Same shape as the core's ports: the interface is the contract, the in-memory
- * class is the one that ships, and a durable store is a later application's
- * problem. `put` replaces by `instrumentId`, which is how state advances.
- */
+/** Where instruments live. `put` replaces by `instrumentId`, which is how state advances. */
 export interface InstrumentStore {
   put(instrument: Instrument): Promise<void>;
   findById(instrumentId: string): Promise<Instrument | undefined>;
@@ -97,9 +81,8 @@ export class InMemoryInstrumentStore implements InstrumentStore {
   /**
    * Stores a new instrument, or advances the one already stored under its token.
    *
-   * Every index is keyed by a field that never changes once set — token,
-   * reference, ceremony — so a re-put with a new state lands in each index
-   * over the old record and nothing goes stale. A put that would change one of
+   * Every index is keyed by a field that never changes once set, so a re-put
+   * lands over the old record in each index. A put that would change one of
    * those fields is refused rather than indexed twice (STYLES §0.3).
    */
   async put(instrument: Instrument): Promise<void> {

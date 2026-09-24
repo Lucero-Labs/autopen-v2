@@ -1,13 +1,10 @@
 /**
  * The issuer's page: describe an instrument, get a link.
  *
- * Nothing here mounts a ceremony. The signer opens the link on `sign.ts`, and
- * the backend decides the journey when they do — this page only says who the
- * signer is and what they sign (`src/routes.ts`).
- *
- * The page stands in for a product's backend, which is why it holds the API
- * key at all. The key is a backend secret; here it lives in `sessionStorage`,
- * dies with the tab, and reaches nothing but the `Authorization` header.
+ * Nothing here mounts a ceremony; the backend decides the journey when the
+ * signer opens the link. The page stands in for a product's backend, which is
+ * why it holds the API key at all: in `sessionStorage`, dying with the tab,
+ * reaching nothing but the `Authorization` header.
  */
 
 import type { InstrumentResponse } from "../src/wire.ts";
@@ -33,11 +30,8 @@ const apiKeyField = document.querySelector("#api-key") as HTMLInputElement;
  * A reference nobody has used before, generated per page load.
  *
  * `externalUserRef` binds permanently to the first email it is seen with —
- * undocumented, and verified against preproduction on 2026-09-13. Reusing one
- * with a different signer fails the eligibility read with a bare
- * `INVALID_REQUEST` that names neither the reference nor the conflict.
- *
- * A fresh reference per load makes that unreachable by accident.
+ * undocumented, measured against preproduction on 2026-09-13 — and reusing it
+ * with another signer fails the eligibility read with a bare `INVALID_REQUEST`.
  */
 (form.elements.namedItem("reference") as HTMLInputElement).value =
   `ar.pagare/harness-${Math.random().toString(36).slice(2, 8)}`;
@@ -80,10 +74,8 @@ async function post(path: string, body: unknown): Promise<unknown> {
 /**
  * Reads eligibility and reports it. Free — no session, no document, no PIN.
  *
- * Informational only: the signing page's handoff reads it again and decides.
- * It answers whether a certificate exists and nothing more: a signer with no
- * signature balance still reads as READY_FOR_SIGNING, so a green answer here
- * does not promise the ceremony can finish
+ * Informational only: it answers whether a certificate exists, and a signer
+ * with no signature balance still reads as READY_FOR_SIGNING
  * (`docs/research/ADDENDUM-quota.md` §2).
  */
 async function readEligibility(email: string, reference: string): Promise<Eligibility> {
