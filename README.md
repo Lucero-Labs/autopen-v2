@@ -17,7 +17,6 @@ first product is Lucero's Argentine *pagaré*.
 | I want to build a product on this. What do I call, what do I own? | [`docs/building-on-autopen.md`](docs/building-on-autopen.md) |
 | Why is the core shaped this way? | `docs/research/RESULT-001-core-signing-evidence.md` §1–§3, then the `ADDENDUM` |
 | What is the work? | The open GitHub issues |
-| How is a ticket designed before coding? | `docs/design/` |
 | What does the vendor actually say? | `docs/vendor/lakaut/` — a faithful mirror at SDK `0.1.0-rc.40` |
 | What is the pagaré product, as designed? | `docs/product/` — prototype + brief. A product on the core, not the core |
 | How do I work in this repo? | [`AGENTS.md`](AGENTS.md) (the repo), [`STYLES.md`](STYLES.md) (the code) |

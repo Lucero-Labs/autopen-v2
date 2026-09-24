@@ -1,8 +1,8 @@
 # STYLES.md
 
 How code is written in this repository. [`AGENTS.md`](AGENTS.md) says what the
-repo is; this says how to work in it. Sections are numbered so reviews and
-design documents can cite them: "§6.2" means the same thing to everyone.
+repo is; this says how to work in it. Sections are numbered so reviews
+can cite them: "§6.2" means the same thing to everyone.
 
 **Scope.** Every file, every PR, every review — by a human or by an automated
 reviewer. Claude Code, Claude Review and any other bot reviewing this repo must
@@ -116,7 +116,7 @@ can find anything.
   for the same thing elsewhere.
 - Operator-facing messages are Spanish, verbatim from the product, and live
   beside the rule that emits them (`policy.ts`), not in a UI layer.
-- Code structure, comments, JSDoc, commits and design docs are English.
+- Code structure, comments, JSDoc and commits are English.
 
 ## 4. Types
 
@@ -380,6 +380,5 @@ Before opening or updating a PR:
 6. Spanish terms are Spanish, ASCII in identifiers, one word per concept (§3.2).
 7. If `rules-pagare-ar` changed: policy `version` bumped, legal reviewer named
    in the PR (§10.1).
-8. A design decision no ticket already made is written in `docs/design/`.
-9. Comments and JSDoc moved with the code, and the fix went where §1.2 puts it,
+8. Comments and JSDoc moved with the code, and the fix went where §1.2 puts it,
    not where the diff was smallest (§0.6).
