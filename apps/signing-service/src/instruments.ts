@@ -31,6 +31,8 @@ export interface Instrument {
   /** The link's only content. Never logged, never returned except inside the link. */
   readonly token: string;
   readonly reference: string;
+  /** The name the product gave its PDF: what the ceremony mounts and the signer downloads. */
+  readonly fileName: string;
   readonly documentId: DocumentId;
   readonly signer: InstrumentSigner;
   readonly ceremony?: InstrumentCeremony;

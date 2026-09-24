@@ -23,7 +23,7 @@ import {
   type SignerRole,
   type VerifiedArtifact,
 } from "@autopen/core";
-import type { SigningEligibility } from "@autopen/adapter-lakaut";
+import { LAKAUT_MAX_DOCUMENT_BYTES, type SigningEligibility } from "@autopen/adapter-lakaut";
 
 import type { EvidenceStore } from "../src/evidence.ts";
 import { probeDatabase } from "../src/health.ts";
@@ -37,12 +37,17 @@ import type {
   StatusResponse,
 } from "../src/wire.ts";
 import { DETAIL_LINES, STATUS_LINES } from "../web/status-lines.ts";
+import {
+  fixtureRequest,
+  minimalPdf,
+  PDF_SENTINEL,
+  SIGNER_EMAIL,
+  SIGNER_PHONE,
+} from "./fixtures.ts";
 
 const AT = new Date("2026-09-24T12:00:00.000Z");
 const ALLOWED_ORIGIN = "https://demo.example.invalid";
 const HOSTED_UI_ORIGIN = "https://hosted-ui.example.invalid";
-const SIGNER_EMAIL = "firmante@example.invalid";
-const SIGNER_PHONE = "+5491100000000";
 const CLIENT_TOKEN = "client-token-never-logged";
 const API_KEY = "test-api-key-never-logged-0123456789abcdef";
 const DATABASE_PASSWORD = "database-password-never-logged";
@@ -176,7 +181,7 @@ async function start(): Promise<Harness> {
       documents,
       ceremonies,
       now: () => AT,
-      maxDocumentBytes: 1_000_000,
+      maxDocumentBytes: LAKAUT_MAX_DOCUMENT_BYTES,
     }),
     checkEligibility: async () => {
       eligibility.calls += 1;
@@ -250,14 +255,9 @@ async function call(
   return { status: response.status, headers: response.headers, json };
 }
 
-function instrumentBody(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
-    email: SIGNER_EMAIL,
-    phone: SIGNER_PHONE,
-    reference: "ar.pagare/test-1",
-    montoCentavos: 190000000,
-    ...overrides,
-  };
+/** A different document under the same fixture reference. */
+function otherPdfBase64(): string {
+  return Buffer.from(minimalPdf("a different document")).toString("base64");
 }
 
 async function createInstrument(
@@ -272,7 +272,7 @@ async function createInstrument(
     harness,
     "POST",
     "/api/instruments",
-    instrumentBody(overrides),
+    fixtureRequest(overrides),
   );
   const created = json as InstrumentResponse;
   const token = created.signingUrl.slice(`${ALLOWED_ORIGIN}/sign/`.length);
@@ -371,13 +371,214 @@ describe("POST /api/instruments", () => {
       harness,
       "POST",
       "/api/instruments",
-      instrumentBody({ montoCentavos: 1 }),
+      fixtureRequest({ pdfBase64: otherPdfBase64() }),
     );
 
     expect(status).toBe(409);
     expect(json).toEqual({
-      error: "reference ar.pagare/test-1 already names a different document",
+      error: "reference harness/test-1 already names a different document",
     });
+  });
+
+  it("refuses the same reference with a different signer, and opens nothing", async () => {
+    await createInstrument(harness);
+
+    const otherEmail = await call(
+      harness,
+      "POST",
+      "/api/instruments",
+      fixtureRequest({ signer: { email: "otra@example.invalid", phone: SIGNER_PHONE } }),
+    );
+    expect(otherEmail.status).toBe(409);
+    expect(otherEmail.json).toEqual({
+      error: "reference harness/test-1 already names a different signer",
+    });
+
+    const otherPhone = await call(
+      harness,
+      "POST",
+      "/api/instruments",
+      fixtureRequest({ signer: { email: SIGNER_EMAIL, phone: "+5491100000001" } }),
+    );
+    expect(otherPhone.status).toBe(409);
+    expect(otherPhone.json).toEqual({
+      error: "reference harness/test-1 already names a different signer",
+    });
+
+    const noPhone = await call(
+      harness,
+      "POST",
+      "/api/instruments",
+      fixtureRequest({ signer: { email: SIGNER_EMAIL } }),
+    );
+    expect(noPhone.status).toBe(409);
+
+    expect(harness.provider.opened).toHaveLength(0);
+    expect(logged.filter((line) => line.startsWith("instrument created"))).toHaveLength(1);
+  });
+
+  it("makes one instrument and one 409 when the same reference is posted at once with different bytes", async () => {
+    const [first, second] = await Promise.all([
+      call(harness, "POST", "/api/instruments", fixtureRequest()),
+      call(harness, "POST", "/api/instruments", fixtureRequest({ pdfBase64: otherPdfBase64() })),
+    ]);
+
+    expect([first.status, second.status].sort()).toEqual([201, 409]);
+    const refused = first.status === 409 ? first : second;
+    expect(refused.json).toEqual({
+      error: "reference harness/test-1 already names a different document",
+    });
+    expect(logged.filter((line) => line.startsWith("instrument created"))).toHaveLength(1);
+  });
+
+  it("returns the existing instrument for the same bytes under another fileName, keeping the first", async () => {
+    const first = await createInstrument(harness);
+    const second = await createInstrument(harness, { fileName: "renamed.pdf" });
+
+    expect(second.status).toBe(200);
+    expect(second.created).toEqual(first.created);
+    expect((await handoff(harness, first.token)).fileName).toBe("test-1.pdf");
+  });
+
+  it("refuses a pdfBase64 that is not canonical base64, before decoding anything", async () => {
+    for (const pdfBase64 of [
+      "JVBERi0!!!!garbage",
+      "this is not base64 at all",
+      "!!!!",
+      "JVBERi0",
+    ]) {
+      const { status, json } = await call(
+        harness,
+        "POST",
+        "/api/instruments",
+        fixtureRequest({ pdfBase64 }),
+      );
+      expect(status).toBe(400);
+      expect(json).toEqual({ error: "pdfBase64 must be base64" });
+    }
+    expect(logged.filter((line) => line.startsWith("instrument created"))).toEqual([]);
+  });
+
+  it("refuses a pdfBase64 that does not decode to a PDF, and seals nothing", async () => {
+    for (const pdfBase64 of [
+      Buffer.from("<!doctype html>not a pdf").toString("base64"),
+      Buffer.from("%PDF").toString("base64"),
+    ]) {
+      const { status, json } = await call(
+        harness,
+        "POST",
+        "/api/instruments",
+        fixtureRequest({ pdfBase64 }),
+      );
+      expect(status).toBe(400);
+      expect(json).toEqual({ error: "pdfBase64 must be a PDF: no %PDF- header" });
+    }
+
+    expect(logged.filter((line) => line.startsWith("instrument created"))).toEqual([]);
+    // The reference is still free: nothing was sealed or stored under it.
+    expect((await createInstrument(harness)).status).toBe(201);
+  });
+
+  it("refuses an empty pdfBase64", async () => {
+    const { status, json } = await call(
+      harness,
+      "POST",
+      "/api/instruments",
+      fixtureRequest({ pdfBase64: "" }),
+    );
+
+    expect(status).toBe(400);
+    expect(json).toEqual({ error: "pdfBase64 must be a non-empty string" });
+  });
+
+  it("refuses bytes over the provider's ceiling with 413, and seals nothing", async () => {
+    // One byte over: past the exact check, but under the body bound that
+    // catches gross oversize before buffering.
+    const bytes = Buffer.alloc(LAKAUT_MAX_DOCUMENT_BYTES + 1, 0);
+    bytes.write("%PDF-1.4\n", 0, "latin1");
+
+    const { status, json } = await call(
+      harness,
+      "POST",
+      "/api/instruments",
+      fixtureRequest({ pdfBase64: bytes.toString("base64") }),
+    );
+
+    expect(status).toBe(413);
+    expect(json).toEqual({
+      error: `pdfBase64 must decode to at most ${LAKAUT_MAX_DOCUMENT_BYTES} bytes`,
+    });
+    expect(logged.filter((line) => line.startsWith("instrument created"))).toEqual([]);
+    expect((await createInstrument(harness)).status).toBe(201);
+  });
+
+  it("refuses a fileName without .pdf, and one over the vendor's 180-character cap", async () => {
+    const noSuffix = await call(
+      harness,
+      "POST",
+      "/api/instruments",
+      fixtureRequest({ fileName: "contrato.docx" }),
+    );
+    expect(noSuffix.status).toBe(400);
+    expect(noSuffix.json).toEqual({ error: "fileName must end with .pdf" });
+
+    const tooLong = await call(
+      harness,
+      "POST",
+      "/api/instruments",
+      fixtureRequest({ fileName: `${"x".repeat(177)}.pdf` }),
+    );
+    expect(tooLong.status).toBe(400);
+    expect(tooLong.json).toEqual({ error: "fileName must be at most 180 characters" });
+
+    expect(
+      (
+        await call(
+          harness,
+          "POST",
+          "/api/instruments",
+          fixtureRequest({ fileName: `${"x".repeat(176)}.pdf` }),
+        )
+      ).status,
+    ).toBe(201);
+  });
+
+  it("accepts .PDF in any case and hands the name back as sent", async () => {
+    const { status, token } = await createInstrument(harness, { fileName: "CONTRATO.PDF" });
+
+    expect(status).toBe(201);
+    expect((await handoff(harness, token)).fileName).toBe("CONTRATO.PDF");
+  });
+
+  it("refuses a body without a signer object", async () => {
+    const { status, json } = await call(
+      harness,
+      "POST",
+      "/api/instruments",
+      fixtureRequest({ signer: SIGNER_EMAIL }),
+    );
+
+    expect(status).toBe(400);
+    expect(json).toEqual({ error: "signer must be an object" });
+  });
+
+  it("refuses a signer.phone that is present and not a string, and takes a blank one as absent", async () => {
+    const number = await call(
+      harness,
+      "POST",
+      "/api/instruments",
+      fixtureRequest({ signer: { email: SIGNER_EMAIL, phone: 5491100000000 } }),
+    );
+    expect(number.status).toBe(400);
+    expect(number.json).toEqual({ error: "signer.phone must be a non-empty string" });
+
+    harness.eligibility.answer = NOT_ELIGIBLE;
+    const { status, token } = await createInstrument(harness, {
+      signer: { email: SIGNER_EMAIL, phone: "" },
+    });
+    expect(status).toBe(201);
+    // Absent, so onboarding is refused for want of a phone.
+    expect((await call(harness, "POST", `/api/sign/${token}/handoff`)).status).toBe(409);
   });
 
   it("ignores a journey the issuer tries to choose: the plan comes from eligibility", async () => {
@@ -394,14 +595,16 @@ describe("POST /api/instruments", () => {
     ]);
   });
 
-  it("refuses a body without an email", async () => {
-    const { status, json } = await call(harness, "POST", "/api/instruments", {
-      reference: "ar.pagare/test-2",
-      montoCentavos: 100,
-    });
+  it("refuses a signer without an email", async () => {
+    const { status, json } = await call(
+      harness,
+      "POST",
+      "/api/instruments",
+      fixtureRequest({ signer: { phone: SIGNER_PHONE } }),
+    );
 
     expect(status).toBe(400);
-    expect(json).toEqual({ error: "email must be a non-empty string" });
+    expect(json).toEqual({ error: "signer.email must be a non-empty string" });
   });
 });
 
@@ -428,14 +631,22 @@ describe("POST /api/sign/{token}/handoff", () => {
       role: "librador",
       email: SIGNER_EMAIL,
       phone: SIGNER_PHONE,
-      externalUserRef: "ar.pagare/test-1",
+      externalUserRef: "harness/test-1",
     });
     expect(payload.state).toBe("awaiting-signature");
     expect(payload.ceremonyId).toBe("session-1");
-    expect(payload.fileName).toBe("ar.pagare-test-1.pdf");
+    expect(payload.fileName).toBe("test-1.pdf");
     expect(payload.handoff.context.hostedUiOrigin).toBe(HOSTED_UI_ORIGIN);
-    expect(payload.document.bytesBase64.length).toBeGreaterThan(0);
+    expect(payload.document.bytesBase64).toBe(
+      Buffer.from(minimalPdf(PDF_SENTINEL)).toString("base64"),
+    );
     expect(logged.join("\n")).toContain("journey=signing factors=email sessionId=session-1");
+  });
+
+  it("hands the page the fileName the product sent, not one derived from the reference", async () => {
+    const { token } = await createInstrument(harness, { fileName: "contrato-42.pdf" });
+
+    expect((await handoff(harness, token)).fileName).toBe("contrato-42.pdf");
   });
 
   it("opens onboarding over email and sms when the signer holds no certificate", async () => {
@@ -451,7 +662,7 @@ describe("POST /api/sign/{token}/handoff", () => {
 
   it("refuses onboarding without a phone and opens nothing", async () => {
     harness.eligibility.answer = NOT_ELIGIBLE;
-    const { token } = await createInstrument(harness, { phone: undefined });
+    const { token } = await createInstrument(harness, { signer: { email: SIGNER_EMAIL } });
 
     const { status, json } = await call(harness, "POST", `/api/sign/${token}/handoff`);
 
@@ -459,7 +670,7 @@ describe("POST /api/sign/{token}/handoff", () => {
     expect(json).toEqual({
       error:
         "the signer holds no certificate, and onboarding needs a phone: " +
-        "create the instrument again with one",
+        "create the instrument again under a new reference, with a phone",
     });
     expect(harness.provider.opened).toHaveLength(0);
   });
@@ -628,7 +839,7 @@ describe("POST /api/sign/{token}/deliveries", () => {
   it("refuses a delivery whose ceremony belongs to another instrument, and archives nothing", async () => {
     const first = await createInstrument(harness);
     const firstOpened = await handoff(harness, first.token);
-    const second = await createInstrument(harness, { reference: "ar.pagare/test-2" });
+    const second = await createInstrument(harness, { reference: "harness/test-2" });
     await handoff(harness, second.token);
 
     // The second link, carrying the first instrument's ceremony and document.
@@ -649,7 +860,7 @@ describe("POST /api/sign/{token}/deliveries", () => {
 
   it("refuses a delivery before any ceremony was opened for the link", async () => {
     const { token } = await createInstrument(harness);
-    const other = await createInstrument(harness, { reference: "ar.pagare/test-2" });
+    const other = await createInstrument(harness, { reference: "harness/test-2" });
     const opened = await handoff(harness, other.token);
 
     const { status } = await call(
@@ -730,7 +941,7 @@ describe("the product API key", () => {
       harness,
       "POST",
       "/api/instruments",
-      instrumentBody(),
+      fixtureRequest(),
       "none",
     );
 
@@ -744,7 +955,7 @@ describe("the product API key", () => {
     const wrong = API_KEY.replace(/.$/, (last) => (last === "f" ? "0" : "f"));
     expect(wrong).toHaveLength(API_KEY.length);
 
-    const { status, json } = await call(harness, "POST", "/api/instruments", instrumentBody(), {
+    const { status, json } = await call(harness, "POST", "/api/instruments", fixtureRequest(), {
       bearer: wrong,
     });
 
@@ -753,10 +964,10 @@ describe("the product API key", () => {
   });
 
   it("refuses a wrong key of a different length without throwing", async () => {
-    const shorter = await call(harness, "POST", "/api/instruments", instrumentBody(), {
+    const shorter = await call(harness, "POST", "/api/instruments", fixtureRequest(), {
       bearer: "short",
     });
-    const longer = await call(harness, "POST", "/api/instruments", instrumentBody(), {
+    const longer = await call(harness, "POST", "/api/instruments", fixtureRequest(), {
       bearer: `${API_KEY}-and-more`,
     });
 
@@ -772,7 +983,7 @@ describe("the product API key", () => {
       "Bearer",
       `Bearer ${API_KEY} x`,
     ]) {
-      const { status } = await call(harness, "POST", "/api/eligibility", instrumentBody(), {
+      const { status } = await call(harness, "POST", "/api/eligibility", fixtureRequest(), {
         header,
       });
       expect(status).toBe(401);
@@ -781,7 +992,7 @@ describe("the product API key", () => {
   });
 
   it("runs the route with the right key, and the key appears in no log line either way", async () => {
-    await call(harness, "POST", "/api/instruments", instrumentBody(), "none");
+    await call(harness, "POST", "/api/instruments", fixtureRequest(), "none");
     const { status, token } = await createInstrument(harness);
 
     expect(status).toBe(201);
@@ -832,7 +1043,7 @@ describe("GET /api/instruments/{id}", () => {
     expect(status).toBe(200);
     expect(json).toEqual({
       instrumentId: created.instrumentId,
-      reference: "ar.pagare/test-1",
+      reference: "harness/test-1",
       documentId: created.documentId,
       state: "awaiting-signature",
       signingUrl: created.signingUrl,
@@ -1016,6 +1227,7 @@ describe("create → handoff → deliver", () => {
     expect(output).not.toContain(SIGNER_PHONE);
     expect(output).not.toContain(bytesBase64);
     expect(output).not.toContain("%PDF");
+    expect(output).not.toContain(PDF_SENTINEL);
   });
 
   it("would catch a logged object, not only a logged string", () => {

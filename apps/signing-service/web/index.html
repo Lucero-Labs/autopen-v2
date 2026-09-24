@@ -98,10 +98,11 @@
   <body>
     <h1>Emitir un instrumento</h1>
     <p class="lede">
-      Preproducción. El servicio sella el pagaré y devuelve un enlace de firma. Quién firma decide
-      el servicio al abrirlo: <code>signing</code> si ya tiene certificado,
-      <code>onboarding-and-signing</code> si no — y ese caso exige teléfono. La clave de API es la
-      del servicio (<code>AUTOPEN_API_KEY</code>); queda en esta pestaña y en ningún otro lado.
+      Preproducción. El servicio sella el PDF que subís, tal cual, y devuelve un enlace de firma.
+      Qué recorrido hace quien firma lo decide el servicio al abrirlo: <code>signing</code> si ya
+      tiene certificado, <code>onboarding-and-signing</code> si no — y ese caso exige teléfono. La
+      clave de API es la del servicio (<code>AUTOPEN_API_KEY</code>); queda en esta pestaña y en
+      ningún otro lado.
     </p>
 
     <!-- method="post": should the script fail to bind, a native submit still
@@ -124,8 +125,8 @@
         <input name="reference" required />
       </label>
       <label>
-        Monto (pesos)
-        <input name="pesos" type="number" min="1" step="1" required value="1900000" />
+        PDF
+        <input name="pdf" type="file" accept="application/pdf" required />
       </label>
       <button type="button" id="check">Consultar elegibilidad</button>
       <button type="submit">Crear instrumento</button>
