@@ -33,7 +33,11 @@ registers it as signed. So the service has the file before anyone asks.
 
 **Knowing it is signed.** The product polls `GET /v1/instruments/{id}`. It says
 `signed` only once the file is saved and verified. Then
-`GET /v1/instruments/{id}/artifact` returns the signed PDF.
+`GET /v1/instruments/{id}/artifact` returns the signed PDF, and
+`GET /v1/instruments/{id}/document` returns the sealed, unsigned one, so a
+product can show what will be signed without keeping its own copy in sync.
+The API key is a backend secret, so a product's page gets these files through
+the product's own backend, not by calling us from the browser.
 
 **Lakaut's webhook.** It arrives at the service, is verified, stored, and
 matched to an instrument by session id. It is a receipt, not the file. A
@@ -94,6 +98,10 @@ PDF bytes and the signer's email never appear in them.
 - A webhook from us to products. Lakaut's inbound webhook does not work yet,
   so polling is the only path that can be trusted today.
 - Embedding our page inside a product's page.
+- A verify route: post a PDF, learn whether it is instrument X's artefact,
+  unaltered. The question a lender or a court asks; not needed to sign.
+- Encrypting stored artefacts with a key the database never holds. The
+  artefact column is opaque bytes so this needs no schema change later.
 - Self-service for keys and budgets. One product is configured by hand.
 - Production Lakaut credentials, still pending on their side.
 
