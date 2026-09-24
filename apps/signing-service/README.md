@@ -1,4 +1,4 @@
-# @autopen/signing-demo
+# @autopen/signing-service
 
 Drives the signing spine against Lakaut preproduction, from two pages, in both
 journeys. It exists to answer questions preproduction can only answer by being
@@ -24,7 +24,7 @@ the page by `postMessage`, which takes no wildcard. An undeclared origin fails
 closed with `403 FORBIDDEN_ORIGIN`.
 
 ```bash
-pnpm --filter=@autopen/signing-demo start
+pnpm --filter=@autopen/signing-service start
 ```
 
 The `start` script is `node --env-file-if-exists=../../.env dist/server.js`:
@@ -47,7 +47,7 @@ A product reaches the service with one key, `AUTOPEN_API_KEY`, sent as
 or malformed header is a `401` whose body says only `unauthorized`, and the
 log line says only `401 <method> <path>` — never the key, never a token, never
 a query string. The key is a backend
-secret; the issuer's page holds it only because the demo has no product behind
+secret; the issuer's page holds it only because the service has no product behind
 it, and keeps it in `sessionStorage` for the tab.
 
 | Route | Answers |
@@ -72,7 +72,7 @@ on every node.
 **The issuer's page** (`/`, `web/client.ts`) describes an instrument: the
 signer's email and phone, a reference, an amount. `POST /api/instruments`
 renders the stand-in pagaré, seals it, and answers with a signing link. The
-page shows the link as an anchor and as text to copy; the demo has no way to
+page shows the link as an anchor and as text to copy; the service has no way to
 send it, so you carry it to the signer yourself. Sending the same reference
 with the same bytes again returns the same instrument and the same link; the
 same reference with different bytes is refused.
@@ -89,7 +89,7 @@ It has no form and takes no choices. It makes one call, `POST
    (`CERTIFICATE_PREPARING`, `RETRY_LATER`) is also a `409`, because onboarding
    someone whose certificate is being issued would onboard them twice.
    (`auth.email-sms.v1` requires `EMAIL` **and** `PHONE`; `signing` also
-   accepts `sms` and `email-and-sms`, but the demo does not need them.)
+   accepts `sms` and `email-and-sms`, but the service does not need them.)
 3. `openCeremony`, and the handoff is stored against the instrument.
 
 Two link openings at once share one flight per token, and two creates with one
@@ -204,7 +204,7 @@ generating a new secret, since the pending one cannot be recovered.
 
 ## Deploying
 
-The root `Dockerfile` builds the demo the way CI does — corepack, the pnpm in
+`apps/signing-service/Dockerfile` builds the service the way CI does, with the repo root as build context because the workspace is what installs — corepack, the pnpm in
 `packageManager`, `.npmrc.example` copied into place — in three stages, so the
 Nexus credential is read by `pnpm install` in stages the runtime image only
 copies from, and reaches no image layer. It arrives as the build argument
@@ -213,7 +213,7 @@ Dockerfile `ARG`s from the service's variables and injects those same
 variables into the running container, so on Railway `LAKAUT_NPM_AUTH` will
 also be present in the runtime environment. `env.ts` ignores it; nothing at
 runtime reads it. The runtime image runs as `node`, listens on `PORT`, owns a
-default `evidence/` so it boots without a volume, and starts with the demo's
+default `evidence/` so it boots without a volume, and starts with the service's
 `start` command in exec form so `node` is PID 1 and handles `SIGTERM`.
 
 Service variables, all read by `src/env.ts` and described in `.env.example`:

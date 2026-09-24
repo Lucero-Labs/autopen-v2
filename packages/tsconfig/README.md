@@ -26,5 +26,5 @@ fails in CI. A package that uses Node APIs declares `@types/node` (from the
 catalog) and adds `"compilerOptions": { "types": ["node"] }`.
 
 A variant used by exactly one config stays beside that config —
-`adapter-lakaut/tsconfig.browser.json`, `signing-demo/tsconfig.web.json` — until
+`adapter-lakaut/tsconfig.browser.json`, `signing-service/tsconfig.web.json` — until
 a second consumer exists.

@@ -40,7 +40,7 @@ const apiKeyField = document.querySelector("#api-key") as HTMLInputElement;
  * A fresh reference per load makes that unreachable by accident.
  */
 (form.elements.namedItem("reference") as HTMLInputElement).value =
-  `ar.pagare/demo-${Math.random().toString(36).slice(2, 8)}`;
+  `ar.pagare/harness-${Math.random().toString(36).slice(2, 8)}`;
 
 apiKeyField.value = sessionStorage.getItem(API_KEY_STORAGE) ?? "";
 apiKeyField.addEventListener("input", () => {

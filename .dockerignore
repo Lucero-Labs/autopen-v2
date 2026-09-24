@@ -10,8 +10,8 @@ node_modules
 dist
 **/dist
 **/dist-browser
-apps/signing-demo/web/client.js
-apps/signing-demo/web/sign.js
+apps/signing-service/web/client.js
+apps/signing-service/web/sign.js
 coverage
 **/coverage
 evidence

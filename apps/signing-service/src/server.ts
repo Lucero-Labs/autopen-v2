@@ -1,5 +1,5 @@
 /**
- * A backend for exercising both signing journeys against preproduction.
+ * The signing service: one API for products, one page for signers, over the core.
  *
  * Deliberately the smallest thing that is still honest about the invariants it
  * demonstrates. It seals real bytes, opens a real ceremony, and reconciles
@@ -9,7 +9,7 @@
  *
  * What it is not: a product. There is no policy gate in front of the seal, no
  * durable store behind it, and one shared API key rather than a product's
- * own. Anything here that looks like a decision was made for the demo, not for
+ * own. Anything here that looks like a decision was made for this service, not for
  * the core — the core's decisions are in `docs/design/signing-spine.md`.
  *
  * This file is wiring only: the environment, the ports, and `listen`. The

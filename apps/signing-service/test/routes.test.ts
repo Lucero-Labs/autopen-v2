@@ -166,7 +166,7 @@ async function start(): Promise<Harness> {
   const documents = new InMemoryDocumentStore();
   const ceremonies = new InMemoryCeremonyLedger();
 
-  const webRoot = await mkdtemp(join(tmpdir(), "signing-demo-"));
+  const webRoot = await mkdtemp(join(tmpdir(), "signing-service-"));
   await writeFile(join(webRoot, "index.html"), "<!doctype html><title>issuer</title>");
   await writeFile(join(webRoot, "sign.html"), "<!doctype html><title>sign</title>");
 

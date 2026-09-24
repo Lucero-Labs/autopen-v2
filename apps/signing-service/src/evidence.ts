@@ -1,5 +1,5 @@
 /**
- * Custody for the demo: a directory of verified signed copies and their manifests.
+ * Custody for the service: a directory of verified signed copies and their manifests.
  *
  * The write is the custody sink the core runs between verifying a delivery and
  * registering its binding, so a rejection here cancels the binding rather than
@@ -7,7 +7,7 @@
  * `GET /api/instruments/{id}/artifact` serves. Both sides sit in one store so
  * the thing that archived a copy is the thing asked to produce it.
  *
- * A directory, not a database: this is the demo's stand-in for durable custody.
+ * A directory, not a database: this is the service's stand-in for durable custody.
  * The *ordering* is not a stand-in.
  */
 
@@ -99,7 +99,7 @@ export class DirectoryEvidenceStore implements EvidenceStore {
     await mkdir(this.#directory, { recursive: true });
     // Two plain writes, no fsync and no write-then-rename: not the vendor's
     // "custodia durable" idiom, and a crash between them leaves a PDF without
-    // its manifest. The Postgres store replaces this; the demo does not fix it.
+    // its manifest. The Postgres store replaces this; the service does not fix it.
     await writeFile(join(this.#directory, `${stem}.pdf`), artifact.bytes);
     await writeFile(
       join(this.#directory, `${stem}.json`),

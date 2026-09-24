@@ -1,7 +1,7 @@
 /**
  * Instruments: what an issuer creates, and what a signing link points at.
  *
- * An instrument is the demo's unit of work above the core's document and
+ * An instrument is the service's unit of work above the core's document and
  * ceremony. It carries the one thing the core does not: the link token. The
  * token is the whole credential for the signing page — whoever holds it can
  * open the ceremony — so it is treated like the handoff it unlocks: generated
