@@ -98,29 +98,19 @@ cost-free eligibility probe itself and picks `signing` or
 the caller choose; that was right for a demo exercising both journeys and
 wrong for an API.
 
-### 2.5 The gate stays in the signing path, selected by an explicit `policyId`
+### 2.5 Gating stays in the product
 
-RESULT-001 §2 has the core gate the document before it is sealed, and §7 calls
-the gate the part that is ours alone. Rules are code and cannot travel over
-HTTP, but they do not need to: the service holds the registered rule sets and a
-product names one. `POST /v1/instruments` carries a `policyId` and a `subject`;
-the service resolves the policy, parses the subject with that policy's own
-parser, evaluates, and seals only on `issuable: true`. Findings come back to
-the caller with the operator-facing messages the rule set wrote (STYLES §3.2)
-and nothing is sealed.
+RESULT-001 §2 has the core gate the document against a rule set the caller
+supplies. Over HTTP a rule set cannot be supplied — rules are code — and a
+product's rules exist only in that product, so that is the only place they can
+be enforced. The service signs what it is given. The pagaré product runs
+`@autopen/gate` with `rules-pagare-ar` in its own process and stores the
+verdict beside its own record of the instrument; a second product's rules are
+its own affair. Nothing about any instrument type reaches the service.
 
-`policyId` is mandatory and one of its values is the explicit `none`, which is
-STYLES §6.2's empty policy: a caller that wants no gate says so, and a caller
-that names nothing gets `400`, not a signature. An unknown id is a refusal, not
-a fallback. The first draft of this document put gating in each product; that
-was reversed because the consumer least able to hold a precondition rule
-correctly is exactly the one being designed for.
-
-The pagaré product sends `ar.pagare.v1` with its `PagareDraft`. A second
-product sends `none` until its rule set exists as a package here, at which
-point it is registered like any other. Rule sets stay packages — the service
-imports them, it does not define them — so `rules-pagare-ar` remains the one
-place a pagaré rule lives and STYLES §10.1 still applies to it.
+A first revision of this document put a mandatory `policyId` on the API so the
+service would run registered rule sets. That was reverted: for a product whose
+rules live elsewhere it added a field to type `none` into, and nothing else.
 
 ### 2.6 Postgres, on Railway, one deployment per Lakaut environment
 
@@ -151,6 +141,28 @@ inbound webhook cannot be verified today, so polling is the only confirmation
 path that exists, and building an event system on top of one we cannot yet
 receive would be building on the part that is broken.
 
+### 2.8 The signed PDF arrives through the page, and only through the page
+
+Lakaut returns no PDF bytes through any channel: the webhook carries a
+constancia, `getSignedDocumentStatus` returns metadata, and there is no
+download endpoint for an integrator (RESULT-001 §1; `[firma]` §"Descargar y
+entregar no son lo mismo"). The only copy reaches us from the signer's browser
+through `onDocumentSigned`, on the hosted page, which is ours. The page posts
+the bytes to the service, `ingest` verifies them against Lakaut's record, the
+custody sink commits them, and the binding is registered. The service holds
+the signed PDF before any product asks whether it is signed; polling (§2.7) is
+how a product learns that, and the artefact route is how it collects it.
+
+That makes a failed delivery the one way to lose a signed document:
+`signed_document_delivery_failed` means the document *is* signed, we hold
+nothing, and there is no second signature (STYLES §9.1). Two things guard it.
+The page mounts with `signedArtifactCompletion: "verified_binding"`, so the
+signer's screen does not say "done" until our custody has completed; if it
+fails, the page keeps the signer on a retry that re-posts the same bytes. And
+because a delivery is a copy that `ingest` verifies rather than trusts, a copy
+re-uploaded later — the signer's own download from the Hosted UI — verifies
+identically, so the fallback of last resort is a re-delivery, not a loss.
+
 ## 3 · Surface
 
 ```ts
@@ -160,8 +172,7 @@ interface Instrument {
   readonly instrumentId: InstrumentId;
   readonly consumerId: ConsumerId;
   readonly reference: string;              // the product's own id, namespaced by consumerId
-  readonly policyId: PolicyKey | "none";   // what gated it; stored with the verdict
-  readonly documentId: DocumentId;         // from `seal`, only after `issuable: true`
+  readonly documentId: DocumentId;         // from `seal`
   readonly signer: { readonly email: string; readonly phone?: string };
   readonly state: "awaiting-signature" | "signed" | "cancelled" | "expired";
   readonly ceremonyIds: readonly CeremonyId[];
@@ -171,7 +182,7 @@ interface Instrument {
 
 | Route | Auth | Does |
 | --- | --- | --- |
-| `POST /v1/instruments` | API key | Gates the `subject` under `policyId`, then seals the PDF (`reference`, bytes, signer). Returns `instrumentId`, `signingUrl`, `state`, or `422` with the findings and nothing sealed. Idempotent on (`consumerId`, `reference`, content hash). Refused at budget zero. |
+| `POST /v1/instruments` | API key | Seals the PDF (`reference`, bytes, signer). Returns `instrumentId`, `signingUrl`, `state`. Idempotent on (`consumerId`, `reference`, content hash). Refused at budget zero. |
 | `GET /v1/instruments/{id}` | API key | The instrument, from the service's own records plus `reconcile` when a ceremony is open. |
 | `GET /v1/instruments/{id}/artifact` | API key | The signed PDF, once `signed`. |
 | `GET /sign/{token}` | none | The hosted page. Creates or resumes the ceremony on first open. |
@@ -179,19 +190,8 @@ interface Instrument {
 | `POST /api/webhooks/lakaut` | HMAC | The demo's inbound route, plus routing. |
 
 `SigningCore` is unchanged. The service is a thin owner of `Instrument` around
-it: gate then `seal` at create, `openCeremony` at first page open, `ingest` at
-delivery, `reconcile` on read and on inbound event. The only pagaré-specific
-import is the registration of `rules-pagare-ar` under its key, beside `none`:
-
-```ts
-// One registry entry per rule set the service can be asked for. `parse` is the
-// rule set's own, so the service never knows a subject's shape.
-interface RegisteredPolicy {
-  readonly key: PolicyKey | "none";
-  readonly parse: (subject: unknown) => TSubject;   // throws → 400, nothing evaluated
-  readonly gate: PolicyGate<TSubject>;
-}
-```
+it: `seal` at create, `openCeremony` at first page open, `ingest` at delivery,
+`reconcile` on read and on inbound event. Nothing about pagarés is imported.
 
 ## 4 · What fails closed
 
@@ -212,10 +212,6 @@ interface RegisteredPolicy {
 - **A second `POST` with the same `reference` and different bytes** → a new
   instrument, never a conflict; a corrected document is a new instrument
   (STYLES §9.2).
-- **No `policyId`, or an unregistered one** → `400`, nothing evaluated,
-  nothing sealed. **A subject the policy's parser rejects** → `400`. **A rule
-  that throws** → the evaluation fails and so does the request (STYLES §6.2),
-  never `issuable: false` and never a seal.
 - **Budget at zero** → `409` before any call to Lakaut. The count is ours; when
   in doubt it has been spent.
 
@@ -224,9 +220,6 @@ interface RegisteredPolicy {
 - **Routes** run against a fake `SignatureProvider` and in-memory stores: no
   live `@lakaut/*` call (STYLES §10). Each row of the table above has a test
   per outcome in §4.
-- **The gate in the path**: `ar.pagare.v1` with a draft missing `lugarDePago`
-  returns `422` carrying the rule set's own Spanish message and no document is
-  stored; `none` seals; a missing or unknown `policyId` seals nothing.
 - **The budget**: the last credit opens a ceremony, the next request is refused
   and the fake provider records no call.
 - **Postgres stores** run against a real Postgres, a service container in CI.
@@ -268,8 +261,6 @@ not engineering's to give.
   which it is not today (`ADDENDUM-quota`, resolved 2026-09-21).
 - A consumer-facing API document beyond `docs/building-on-autopen.md`, and any
   self-service issuance of keys or budgets. One consumer is configured by hand.
-- A second rule set in the registry. `none` is what a second product gets
-  until its rules exist as a package under STYLES §10.1.
 
 **What must be true before the seam becomes a second consumer**
 
