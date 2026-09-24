@@ -113,3 +113,8 @@ cost; when do production credentials arrive.
 
 For us: what the second product signs, who signs it, and roughly how many a
 month. Until that is written down, it gets a key against staging and a budget.
+
+## Shipped 2026-09-24
+
+Routes live under `/api/`, not `/v1/`. Artefacts are on disk until the Postgres
+change; one shared key until per-product keys. Otherwise as above (#61, #64).
