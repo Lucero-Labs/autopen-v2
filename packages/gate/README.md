@@ -34,8 +34,8 @@ const verdict = await gate.evaluate(draft, { instrumentType: "lease", jurisdicti
 if (!verdict.issuable) showBlockers(verdict.findings);
 ```
 
-`@autopen/rules-pagare-ar` is a worked example: the Argentine pagaré rule set,
-with nothing engine-specific in it.
+The Argentine pagaré rule set, now in the pagaré app's own repository, was
+the first rule set written against this engine.
 
 ## The four extension points
 

@@ -15,9 +15,8 @@ The test is **deployable or importable**.
 | `apps/` | Has a process. You start it, deploy it, point a URL at it. |
 | `packages/` | Has no process. Something else imports it. |
 
-So `packages/rules-pagare-ar`, a rule set with no runtime, is a package. A
-server that runs those rules through the gate and hands the result to a
-ceremony would be an app.
+So a rule set with no runtime is a package. A server that runs rules through
+the gate and hands the result to a ceremony is an app.
 
 ## Adding one
 

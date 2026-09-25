@@ -15,8 +15,8 @@ A **signing and evidence core**. A caller supplies a pre-built PDF and a set of
 precondition rules; the core gates the document, seals it, runs a signature
 ceremony through Lakaut — an Argentine certifying authority, and the only
 provider — ingests the signed artefact and assembles a verifiable evidence
-bundle. The first document is an Argentine *pagaré*; its rule set is
-`packages/rules-pagare-ar`.
+bundle. Products live elsewhere: the pagaré app is its own repository and
+calls `apps/signing-service` over HTTP.
 
 **Direction.** The core is expected to be consumed as an API by more than one
 product. Lakaut has no tenant dimension — one `integratorId`, one webhook URL per
@@ -39,13 +39,10 @@ RESULT-001 itself is never edited.
 apps/                      deployable products; see apps/README.md
 packages/core/             contracts + error classes + the signing spine. Zero dependencies.
 packages/gate/             PolicyGate engine, InMemoryPolicyRegistry, rule factories
-packages/rules-pagare-ar/  the Argentine pagaré rule set
 packages/adapter-lakaut/   the Lakaut provider. The only package importing @lakaut/*
 packages/tsconfig/         compiler settings every package extends; see its README
 docs/research/             RESULT-001 (architecture investigation) + dated addenda (what changed since)
 docs/vendor/lakaut/        21 mirrored Lakaut doc pages + llms.txt, pinned at SDK rc.40
-docs/product/              the current design prototype and a brief distilled from it
-docs/vendor/prototipo/     the 2026-08-16 prototype, superseded; cited by RESULT-001
 scripts/verify.sh          the one command that must pass on a laptop and in the cloud
 scripts/check-docs.mjs     the checkable half of STYLES §5
 lefthook.yml               git hooks: format on commit, check on push
@@ -55,7 +52,7 @@ lefthook.yml               git hooks: format on commit, check on push
 package does not. See `apps/README.md` before creating either.
 
 Dependency direction is strict: `core` imports nothing; `gate` imports `core`;
-`rules-pagare-ar` imports both; `adapter-lakaut` imports `core` and `@lakaut/*`
+`adapter-lakaut` imports `core` and `@lakaut/*`
 and is the only package that may; apps import packages; nothing in `packages/`
 imports `apps/`. The adapter sits behind the `SignatureProvider` port, so
 everything else is tested without a live call (STYLES §2, §10).

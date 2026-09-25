@@ -89,7 +89,7 @@ When two approaches both work, these decide. They override personal preference.
 ### 3.1 Identifiers
 
 - Standard TypeScript casing: camelCase functions and values, PascalCase types,
-  SCREAMING_SNAKE for a frozen module constant (`PAGARE_AR_KEY`). Rule
+  SCREAMING_SNAKE for a frozen module constant (`LAKAUT_MAX_DOCUMENT_BYTES`). Rule
   factories are nouns (`required`, `onlyWhen`); everything else verb-first.
 - Error classes are `<Problem>Error` extending `CoreError`. Generic parameters
   are `T<Role>` (`TSubject`). Booleans read as a verdict: `isPresent`,
@@ -112,8 +112,8 @@ can find anything.
   Accents live in strings, comments and prose.
 - A concept with an exact, universally recognised English equivalent may be
   English — `debtor`, `nationalId`, `instrument` — but pick one word per
-  concept and keep it. `rules-pagare-ar` says `debtor`; do not add `deudor`
-  for the same thing elsewhere.
+  concept and keep it: if a module says `debtor`, do not add `deudor` for the
+  same thing elsewhere.
 - Operator-facing messages are Spanish, verbatim from the product, and live
   beside the rule that emits them (`policy.ts`), not in a UI layer.
 - Code structure, comments, JSDoc and commits are English.
@@ -333,8 +333,8 @@ vendor documentation is.
 - `describe` names the unit or behaviour; `it` is a sentence that reads as a
   claim: `it("throws rather than guessing when no policy is registered")`.
   `it("works")` or an assertion-free test is review-blocking.
-- Test through the public surface. `rules-pagare-ar` runs the real `PolicyGate`
-  over the real policy, not the rule functions in isolation.
+- Test through the public surface: a rule set runs the real `PolicyGate` over
+  the real policy, not the rule functions in isolation.
 - Assert operator-facing message text, not only that a finding exists. The
   message is the product; a test that passes when it changes protects nothing.
 - Keep runtime-agnostic packages runtime-agnostic in tests: `await
@@ -345,11 +345,11 @@ vendor documentation is.
 
 ### 10.1 Legal rules need a named human
 
-Nothing in `rules-pagare-ar` — a new rule, a changed message, a severity change
-— ships because tests pass. A wrong precondition produces a document that looks
-correct and is unenforceable, and no test catches that. The PR names the person
-who reviewed the legal content and bumps the policy `version`, so a stored
-verdict stays explicable after the rules change.
+A rule set that encodes legal preconditions — none lives here today; the
+pagaré's is in the product's own repository — never ships because tests pass. A
+wrong precondition produces a document that looks correct and is unenforceable,
+and no test catches that. The PR names the person who reviewed the legal
+content and bumps the policy `version`, so a stored verdict stays explicable.
 
 ## 11. Commits, branches, PRs
 
@@ -361,8 +361,7 @@ verdict stays explicable after the rules change.
   `Co-Authored-By` and `Claude-Session` trailers.
 - PR description: the decision and its reasoning, what was verified and how.
   References to the prototype or to anything outside this repo go here (§0.7).
-- Nothing under `packages/` merges without `pnpm verify` green. Nothing in
-  `rules-pagare-ar` merges without §10.1.
+- Nothing under `packages/` merges without `pnpm verify` green.
 
 ## 12. Pre-finish checklist
 
@@ -378,7 +377,5 @@ Before opening or updating a PR:
 5. Dependency direction holds: no `apps/` import in `packages/`, no `@lakaut/*`
    outside the adapter (§2).
 6. Spanish terms are Spanish, ASCII in identifiers, one word per concept (§3.2).
-7. If `rules-pagare-ar` changed: policy `version` bumped, legal reviewer named
-   in the PR (§10.1).
-8. Comments and JSDoc moved with the code, and the fix went where §1.2 puts it,
+7. Comments and JSDoc moved with the code, and the fix went where §1.2 puts it,
    not where the diff was smallest (§0.6).

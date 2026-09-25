@@ -18,7 +18,6 @@ first product is Lucero's Argentine *pagaré*.
 | Why is the core shaped this way? | `docs/research/RESULT-001-core-signing-evidence.md` §1–§3, then the `ADDENDUM` |
 | What is the work? | The open GitHub issues |
 | What does the vendor actually say? | `docs/vendor/lakaut/` — a faithful mirror at SDK `0.1.0-rc.40` |
-| What is the pagaré product, as designed? | `docs/product/` — prototype + brief. A product on the core, not the core |
 | How do I work in this repo? | [`AGENTS.md`](AGENTS.md) (the repo), [`STYLES.md`](STYLES.md) (the code) |
 
 ## What exists
@@ -30,13 +29,6 @@ packages/core/             contracts, error classes, and the signing spine. Zero
 packages/gate/             PolicyGate engine, InMemoryPolicyRegistry, rule factories
 packages/adapter-lakaut/   the Lakaut provider, behind the SignatureProvider port
 packages/tsconfig/         shared compiler settings
-```
-
-The pagaré product — the first thing built on it:
-
-```
-packages/rules-pagare-ar/  the Argentine pagaré rule set, registered with the gate
-docs/product/              the pagaré product's prototype and brief
 ```
 
 And the service:
