@@ -65,5 +65,5 @@ webhook to you yet.
 - Keep the signed file for you forever. Fetch the artefact and store it.
 - Notify you. Poll.
 
-Every product shares one signing balance at the authority; the service counts
-your signatures and refuses at zero.
+Every product draws on one signing balance at the authority. A per-product
+budget is planned, not built.
