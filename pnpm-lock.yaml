@@ -123,25 +123,6 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@types/node@22.18.1)(vite@8.2.2(@types/node@22.18.1)(esbuild@0.28.2))
 
-  packages/rules-pagare-ar:
-    dependencies:
-      '@autopen/core':
-        specifier: workspace:*
-        version: link:../core
-      '@autopen/gate':
-        specifier: workspace:*
-        version: link:../gate
-    devDependencies:
-      '@autopen/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.11(@types/node@22.18.1)(vite@8.2.2(@types/node@22.18.1)(esbuild@0.28.2))
-
   packages/tsconfig: {}
 
 packages:

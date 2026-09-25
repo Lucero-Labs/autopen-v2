@@ -15,8 +15,8 @@ and `apps/signing-service/` as the worked example.
 | Your pages | The signing surface inside your page |
 | Where the signed file is stored | Verifying the file against the authority's record, and refusing to bind one that was not stored |
 
-Nothing about the pagaré lives in the core. `packages/rules-pagare-ar` and
-`docs/product/` are one product's; your product gets its own.
+Nothing about any document type lives in the core. The pagaré app, rules and
+all, is its own repository; your product gets its own.
 
 ## The calls, in order
 
