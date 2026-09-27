@@ -28,7 +28,7 @@ POST /api/eligibility
     "decision": "READY_FOR_SIGNING" | "ONBOARDING_REQUIRED" | "CERTIFICATE_PREPARING" | "RETRY_LATER",
     "journey": "signing" | "onboarding-and-signing",   // absent when none is recommended
     "nextAction": "CREATE_SESSION" | "RETRY" | "CONTACT_LAKAUT",
-    "retryAfterSeconds": 120,                           // only with RETRY_LATER
+    "retryAfterSeconds": 120,                           // when the authority gives one
     "checkedAt": "2026-09-27T14:00:00.000Z",
     "validUntil": "2026-09-27T14:00:30.000Z",
     "correlationId": "…"
@@ -38,8 +38,8 @@ POST /api/eligibility
 | `decision` | What it means for you |
 | --- | --- |
 | `READY_FOR_SIGNING` | The signer has a certificate. Create the instrument and send the link. |
-| `ONBOARDING_REQUIRED` | No certificate yet. The link runs an identity check first (DNI and a selfie, a few minutes). Create the instrument **with `signer.phone`**, or the link is refused when opened. |
-| `CERTIFICATE_PREPARING`, `RETRY_LATER` | Not yet. Ask again after `retryAfterSeconds` when present. An instrument created now cannot open its ceremony. |
+| `ONBOARDING_REQUIRED` | No certificate yet. The link runs an identity check first (DNI and a live capture on camera, a few minutes). Create the instrument **with `signer.phone`**, or the link is refused when opened. |
+| `CERTIFICATE_PREPARING`, `RETRY_LATER` | Not yet. Ask again after `retryAfterSeconds` when present. You may still create the instrument: the service asks again when the signer opens the link, and refuses the page only if the answer is still not yet. |
 
 No time estimate comes back; the minutes in your mail are yours. `validUntil`
 is usually seconds away, so read again instead of caching.
