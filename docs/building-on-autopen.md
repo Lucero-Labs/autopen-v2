@@ -13,8 +13,8 @@ or install its SDK.
   URL or a log. A wrong or missing key is `401 { "error": "unauthorized" }`.
 - Bodies and responses are JSON. Files travel as base64.
 - The contract, field by field, is `GET /openapi.json` on the service, no key
-  needed. It is generated from the code, so it is never behind. This page is
-  the part a spec cannot say.
+  needed. The shapes are generated from the code, so they are never behind.
+  This page is the part a spec cannot say.
 - Routes match exactly. A `GET` on a `POST` route, or a trailing slash, is
   `404 { "error": "no such route" }`.
 
@@ -61,7 +61,8 @@ POST /api/instruments
 
 `reference` is your own id for the document; a UUID from your database is
 fine. `phone` is needed when the signer has never signed with the authority
-before, so send it. The PDF must be a real PDF and at most 20 MB.
+before, so send it. The PDF must be a real PDF and at most 21 MiB (the
+authority's own figure is 20 MB).
 
 An instrument's identity is its reference, its bytes and its signer:
 

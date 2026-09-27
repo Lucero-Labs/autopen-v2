@@ -15,7 +15,7 @@ import { z } from "zod";
 import type { CeremonyDisposition, CeremonyHandoff, CeremonyState } from "@autopen/core";
 
 /** The vendor's cap on `fileName` (`sdk-integracion__documentos-firma.md`, "Validaciones del documento"). */
-export const MAX_FILE_NAME_CHARS = 180;
+const MAX_FILE_NAME_CHARS = 180;
 
 /**
  * Canonical RFC 4648 base64, padding included; the decoder is lenient, so this
@@ -34,11 +34,11 @@ const fileName = nonEmpty
 // ─── Product API ────────────────────────────────────────────────────────────
 
 /** Who signs, as a product names them. A blank `phone` is read as absent. */
-export const signerInput = z.object({
+const signerInput = z.object({
   email: nonEmpty.meta({ description: "Where the authority sends the OTP." }),
   phone: z.string().optional().meta({
     description:
-      "E.164. Required when the signer holds no certificate yet: onboarding authenticates by SMS as well.",
+      "With country code. Required when the signer holds no certificate yet: onboarding authenticates by SMS as well.",
   }),
 });
 
@@ -48,9 +48,11 @@ export const createInstrumentRequest = z.object({
     description:
       "Your own id for the document. Part of the instrument's identity, and the handle the authority binds to the signer's email, so never reused for another person.",
   }),
-  fileName: fileName.refine((name) => name.toLowerCase().endsWith(".pdf"), {
-    error: "fileName must end with .pdf",
-  }),
+  fileName: fileName
+    .refine((name) => name.toLowerCase().endsWith(".pdf"), { error: "fileName must end with .pdf" })
+    .meta({
+      description: "What the signer downloads. Ends in .pdf, any case; at most 180 characters.",
+    }),
   pdfBase64: nonEmpty
     .regex(BASE64_SHAPE, { error: "pdfBase64 must be base64" })
     .refine((encoded) => encoded.length % 4 === 0, { error: "pdfBase64 must be base64" })
@@ -60,9 +62,6 @@ export const createInstrumentRequest = z.object({
     }),
   signer: signerInput,
 });
-
-/** What a product may send to create an instrument, as parsed. */
-export type CreateInstrumentBody = Readonly<z.infer<typeof createInstrumentRequest>>;
 
 /** `POST /api/eligibility`: the person, by the reference the instrument will carry and their email. */
 export const eligibilityRequest = z.object({
@@ -78,7 +77,7 @@ export const eligibilityRequest = z.object({
  * `signed` is set only after `ingest` resolves: the browser or the provider
  * saying the flow completed is still `awaiting-signature` here (STYLES §9.1).
  */
-export const instrumentState = z.enum(["awaiting-signature", "signed"]);
+const instrumentState = z.enum(["awaiting-signature", "signed"]);
 
 /** See `instrumentState`. */
 export type InstrumentState = z.infer<typeof instrumentState>;
@@ -111,15 +110,12 @@ export type InstrumentResponse = z.infer<typeof instrumentResponse>;
  * will run an identity check first, and that instrument needs `signer.phone`.
  * The other two mean not yet: `retryAfterSeconds` says when to ask again.
  */
-export const eligibilityDecision = z.enum([
+const eligibilityDecision = z.enum([
   "READY_FOR_SIGNING",
   "ONBOARDING_REQUIRED",
   "CERTIFICATE_PREPARING",
   "RETRY_LATER",
 ]);
-
-/** See `eligibilityDecision`. */
-export type EligibilityDecision = z.infer<typeof eligibilityDecision>;
 
 /**
  * `POST /api/eligibility`: the free read a product makes before creating an
@@ -146,7 +142,7 @@ export const eligibilityResponse = z
 export type EligibilityResponse = z.infer<typeof eligibilityResponse>;
 
 /** What `GET /health` reports about the database, from a TCP probe; `unconfigured` is not a fault. */
-export const databaseReachability = z.enum(["unconfigured", "reachable", "unreachable"]);
+const databaseReachability = z.enum(["unconfigured", "reachable", "unreachable"]);
 
 /** See `databaseReachability`. */
 export type DatabaseReachability = z.infer<typeof databaseReachability>;
