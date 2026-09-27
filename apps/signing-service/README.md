@@ -57,6 +57,7 @@ it, and keeps it in `sessionStorage` for the tab.
 | `GET /api/instruments/{id}/document` | the sealed, unsigned PDF |
 | `GET /api/instruments/{id}/artifact` | the signed PDF; `404` until `state` is `signed` |
 | `POST /api/eligibility` | the free eligibility read — a probe of a person's status, so behind the key too |
+| `GET /openapi.json` | the product API as OpenAPI 3.0, generated from `src/wire.ts`; no key |
 
 The two pages and the webhook carry their own credentials — the link token,
 the HMAC — and take no key.

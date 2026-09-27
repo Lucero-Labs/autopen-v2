@@ -12,6 +12,9 @@ or install its SDK.
   is a backend secret: use it from server code only, never from a browser, a
   URL or a log. A wrong or missing key is `401 { "error": "unauthorized" }`.
 - Bodies and responses are JSON. Files travel as base64.
+- The contract, field by field, is `GET /openapi.json` on the service, no key
+  needed. It is generated from the code, so it is never behind. This page is
+  the part a spec cannot say.
 - Routes match exactly. A `GET` on a `POST` route, or a trailing slash, is
   `404 { "error": "no such route" }`.
 
@@ -24,15 +27,7 @@ their identity on camera.
 ```
 POST /api/eligibility
 { "reference": "lease/2026-0042", "email": "firmante@example.com" }
-→ 200 {
-    "decision": "READY_FOR_SIGNING" | "ONBOARDING_REQUIRED" | "CERTIFICATE_PREPARING" | "RETRY_LATER",
-    "journey": "signing" | "onboarding-and-signing",   // absent when none is recommended
-    "nextAction": "CREATE_SESSION" | "RETRY" | "CONTACT_LAKAUT",
-    "retryAfterSeconds": 120,                           // when the authority gives one
-    "checkedAt": "2026-09-27T14:00:00.000Z",
-    "validUntil": "2026-09-27T14:00:30.000Z",
-    "correlationId": "…"
-  }
+→ 200 { "decision": "READY_FOR_SIGNING", "journey": "signing", … }
 ```
 
 | `decision` | What it means for you |
