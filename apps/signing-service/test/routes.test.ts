@@ -573,7 +573,7 @@ describe("POST /api/instruments", () => {
     expect(json).toEqual({ error: "signer must be an object" });
   });
 
-  it("refuses a signer.phone that is present and not a string, and takes a blank one as absent", async () => {
+  it("refuses a signer.phone that is not a string or not a number the authority can text, and takes a blank one as absent", async () => {
     const number = await call(
       harness,
       "POST",
@@ -582,6 +582,22 @@ describe("POST /api/instruments", () => {
     );
     expect(number.status).toBe(400);
     expect(number.json).toEqual({ error: "signer.phone must be a non-empty string" });
+
+    // The provider's own rule, applied here so the product hears it, not the signer at the link.
+    for (const phone of ["1155551234", "+54 9 11 5555 1234", "+541155551234"]) {
+      const { status, json } = await call(
+        harness,
+        "POST",
+        "/api/instruments",
+        fixtureRequest({ signer: { email: SIGNER_EMAIL, phone } }),
+      );
+      expect(status).toBe(400);
+      expect(json).toEqual({
+        error:
+          "signer.phone must be an SMS number in E.164 (+5491100000000); Argentina is +549 and ten digits",
+      });
+    }
+    expect(harness.provider.opened).toHaveLength(0);
 
     harness.eligibility.answer = NOT_ELIGIBLE;
     const { status, token } = await createInstrument(harness, {

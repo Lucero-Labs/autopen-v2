@@ -37,6 +37,7 @@ import {
 import {
   answerWebhookChallenge,
   type CeremonyNotification,
+  isSmsPhone,
   isWebhookChallenge,
   LAKAUT_MAX_DOCUMENT_BYTES,
   readCeremonyNotification,
@@ -216,6 +217,14 @@ function readPdf(encoded: string): Uint8Array {
 function toCreateInstrumentRequest(body: unknown): CreateInstrumentRequest {
   const parsed = parseBody(createInstrumentRequest, body);
   const phone = parsed.signer.phone;
+  // The provider rejects a number it cannot text only at session creation,
+  // when the signer has the link open; the product hears about it here instead.
+  if (phone !== undefined && phone !== "" && !isSmsPhone(phone)) {
+    throw new RefusedError(
+      400,
+      "signer.phone must be an SMS number in E.164 (+5491100000000); Argentina is +549 and ten digits",
+    );
+  }
   return {
     reference: parsed.reference,
     fileName: parsed.fileName,

@@ -38,7 +38,7 @@ const signerInput = z.object({
   email: nonEmpty.meta({ description: "Where the authority sends the OTP." }),
   phone: z.string().optional().meta({
     description:
-      "With country code. Required when the signer holds no certificate yet: onboarding authenticates by SMS as well.",
+      "E.164, e.g. +5491100000000; for Argentina +549 and the ten-digit mobile number. Required when the signer holds no certificate yet: onboarding authenticates by SMS as well.",
   }),
 });
 

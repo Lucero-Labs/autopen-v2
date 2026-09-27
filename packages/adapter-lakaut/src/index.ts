@@ -1,4 +1,5 @@
 export {
+  isSmsPhone,
   LakautSignatureProvider,
   LAKAUT_MAX_DOCUMENT_BYTES,
   type LakautProviderOptions,
