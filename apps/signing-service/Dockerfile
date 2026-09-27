@@ -30,7 +30,6 @@ ENV CI=true
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc.example ./
 COPY packages/core/package.json packages/core/
 COPY packages/gate/package.json packages/gate/
-COPY packages/rules-pagare-ar/package.json packages/rules-pagare-ar/
 COPY packages/adapter-lakaut/package.json packages/adapter-lakaut/
 COPY packages/tsconfig/package.json packages/tsconfig/
 COPY apps/signing-service/package.json apps/signing-service/
