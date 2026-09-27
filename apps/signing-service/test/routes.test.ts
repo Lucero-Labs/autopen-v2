@@ -28,8 +28,10 @@ import { LAKAUT_MAX_DOCUMENT_BYTES, type SigningEligibility } from "@autopen/ada
 import type { EvidenceStore } from "../src/evidence.ts";
 import { probeDatabase } from "../src/health.ts";
 import { cryptoInstrumentIds, InMemoryInstrumentStore } from "../src/instruments.ts";
+import { OPENAPI_DOCUMENT } from "../src/openapi.ts";
 import { createRouter, type RouterDependencies } from "../src/routes.ts";
 import type {
+  EligibilityResponse,
   ErrorResponse,
   HandoffResponse,
   HealthResponse,
@@ -68,6 +70,15 @@ const NOT_ELIGIBLE: SigningEligibility = Object.freeze({
   checkedAt: AT.toISOString(),
   validUntil: AT.toISOString(),
   correlationId: "sdk_onboarding",
+});
+
+const NOT_YET: SigningEligibility = Object.freeze({
+  decision: "RETRY_LATER",
+  nextAction: "RETRY",
+  retryAfterSeconds: 120,
+  checkedAt: AT.toISOString(),
+  validUntil: AT.toISOString(),
+  correlationId: "sdk_retry",
 });
 
 /** Records what the router asked of the provider, and answers however a test needs. */
@@ -1034,6 +1045,65 @@ describe("the product API key", () => {
   });
 });
 
+describe("POST /api/eligibility", () => {
+  it("returns the authority's answer field by field, with the journey when one is recommended", async () => {
+    const { status, json } = await call(harness, "POST", "/api/eligibility", {
+      reference: "harness/test-1",
+      email: "firmante@example.com",
+    });
+
+    expect(status).toBe(200);
+    expect(json).toEqual({
+      decision: "READY_FOR_SIGNING",
+      journey: "signing",
+      nextAction: "CREATE_SESSION",
+      checkedAt: AT.toISOString(),
+      validUntil: AT.toISOString(),
+      correlationId: "sdk_eligible",
+    } satisfies EligibilityResponse);
+  });
+
+  it("carries retryAfterSeconds and no journey when the authority says not yet", async () => {
+    harness.eligibility.answer = NOT_YET;
+
+    const { status, json } = await call(harness, "POST", "/api/eligibility", {
+      reference: "harness/test-1",
+      email: "firmante@example.com",
+    });
+
+    expect(status).toBe(200);
+    expect(json).toEqual({
+      decision: "RETRY_LATER",
+      nextAction: "RETRY",
+      retryAfterSeconds: 120,
+      checkedAt: AT.toISOString(),
+      validUntil: AT.toISOString(),
+      correlationId: "sdk_retry",
+    } satisfies EligibilityResponse);
+    expect(json).not.toHaveProperty("journey");
+  });
+
+  it("refuses a body missing the reference or the email, and asks the authority nothing", async () => {
+    for (const [body, missing] of [
+      [{ email: "firmante@example.com" }, "reference"],
+      [{ reference: "harness/test-1" }, "email"],
+    ] as const) {
+      const { status, json } = await call(harness, "POST", "/api/eligibility", body);
+      expect(status).toBe(400);
+      expect(json).toEqual({ error: `${missing} must be a non-empty string` });
+    }
+    expect(harness.eligibility.calls).toBe(0);
+  });
+
+  it("is POST only: a GET with a valid key is no route, not a refusal", async () => {
+    const { status, json } = await call(harness, "GET", "/api/eligibility");
+
+    expect(status).toBe(404);
+    expect(json).toEqual({ error: "no such route" } satisfies ErrorResponse);
+    expect(harness.eligibility.calls).toBe(0);
+  });
+});
+
 describe("GET /api/instruments/{id}", () => {
   it("returns the instrument as the product sees it, with the same link and no token elsewhere", async () => {
     const { created } = await createInstrument(harness);
@@ -1097,6 +1167,63 @@ describe("GET /api/instruments/{id}", () => {
     expect(
       (await call(harness, "GET", `/api/instruments/${created.instrumentId}`)).json,
     ).toMatchObject({ state: "signed" });
+  });
+});
+
+describe("GET /openapi.json", () => {
+  it("serves the document without a key, and it is the one built from the wire schemas", async () => {
+    const { status, headers, json } = await call(
+      harness,
+      "GET",
+      "/openapi.json",
+      undefined,
+      "none",
+    );
+
+    expect(status).toBe(200);
+    expect(headers.get("content-type")).toMatch(/^application\/json/);
+    expect(json).toEqual(JSON.parse(JSON.stringify(OPENAPI_DOCUMENT)));
+  });
+
+  it("declares only routes the router serves: none of them answers no such route", async () => {
+    const { created } = await createInstrument(harness);
+    const declared = Object.entries(OPENAPI_DOCUMENT.paths).flatMap(([path, item]) =>
+      Object.keys(item).map(
+        (method) =>
+          [
+            method.toUpperCase() as "GET" | "POST",
+            path.replace("{instrumentId}", created.instrumentId),
+          ] as const,
+      ),
+    );
+    expect(declared.length).toBeGreaterThanOrEqual(6);
+
+    for (const [method, path] of declared) {
+      const { status, json } = await call(
+        harness,
+        method,
+        path,
+        method === "POST" ? {} : undefined,
+      );
+      expect({ path, status, json }).not.toEqual({
+        path,
+        status: 404,
+        json: { error: "no such route" },
+      });
+    }
+  });
+
+  it("resolves every $ref to a published schema, and publishes the create body a product sends", () => {
+    const names = Object.keys(OPENAPI_DOCUMENT.components.schemas);
+    for (const [, name] of JSON.stringify(OPENAPI_DOCUMENT.paths).matchAll(
+      /#\/components\/schemas\/(\w+)/g,
+    )) {
+      expect(names).toContain(name);
+    }
+
+    const required = ["reference", "fileName", "pdfBase64", "signer"];
+    expect(OPENAPI_DOCUMENT.components.schemas.CreateInstrumentRequest.required).toEqual(required);
+    expect(Object.keys(fixtureRequest())).toEqual(expect.arrayContaining(required));
   });
 });
 

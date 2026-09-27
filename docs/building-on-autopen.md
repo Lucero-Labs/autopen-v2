@@ -12,6 +12,38 @@ or install its SDK.
   is a backend secret: use it from server code only, never from a browser, a
   URL or a log. A wrong or missing key is `401 { "error": "unauthorized" }`.
 - Bodies and responses are JSON. Files travel as base64.
+- The contract, field by field, is `GET /openapi.json` on the service, no key
+  needed. The shapes are generated from the code, so they are never behind.
+  This page is the part a spec cannot say.
+- Routes match exactly. A `GET` on a `POST` route, or a trailing slash, is
+  `404 { "error": "no such route" }`.
+
+## Ask whether the signer already has a certificate
+
+Optional, free, and worth doing before you write the mail: it tells you
+whether the signer will sign in a minute or first spend a few minutes proving
+their identity on camera.
+
+```
+POST /api/eligibility
+{ "reference": "lease/2026-0042", "email": "firmante@example.com" }
+→ 200 { "decision": "READY_FOR_SIGNING", "journey": "signing", … }
+```
+
+| `decision` | What it means for you |
+| --- | --- |
+| `READY_FOR_SIGNING` | The signer has a certificate. Create the instrument and send the link. |
+| `ONBOARDING_REQUIRED` | No certificate yet. The link runs an identity check first (DNI and a live capture on camera, a few minutes). Create the instrument **with `signer.phone`**, or the link is refused when opened. |
+| `CERTIFICATE_PREPARING`, `RETRY_LATER` | Not yet. Ask again after `retryAfterSeconds` when present. You may still create the instrument: the service asks again when the signer opens the link, and refuses the page only if the answer is still not yet. |
+
+No time estimate comes back; the minutes in your mail are yours. `validUntil`
+is usually seconds away, so read again instead of caching.
+
+Use the same `reference` you will create the instrument with. Today the
+service hands that reference to the authority as its handle for the person,
+and the authority binds it to the first email it sees it with, permanently, so
+a reference is never reused for a different signer. A reference that was never
+used is free.
 
 ## Create an instrument
 
@@ -29,7 +61,8 @@ POST /api/instruments
 
 `reference` is your own id for the document; a UUID from your database is
 fine. `phone` is needed when the signer has never signed with the authority
-before, so send it. The PDF must be a real PDF and at most 20 MB.
+before, so send it. The PDF must be a real PDF and at most 21 MiB (the
+authority's own figure is 20 MB).
 
 An instrument's identity is its reference, its bytes and its signer:
 

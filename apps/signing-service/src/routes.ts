@@ -16,6 +16,8 @@ import type { IncomingMessage, RequestListener, ServerResponse } from "node:http
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 
+import type { z } from "zod";
+
 import {
   type CeremonyHandoff,
   type CeremonyId,
@@ -45,15 +47,21 @@ import {
 import type { EvidenceStore } from "./evidence.ts";
 import type { DatabaseProbe } from "./health.ts";
 import type { Instrument, InstrumentIds, InstrumentStore } from "./instruments.ts";
-import type {
-  DatabaseReachability,
-  DeliveryResponse,
-  ErrorResponse,
-  HandoffResponse,
-  HealthResponse,
-  InstrumentResponse,
-  SigningStatus,
-  StatusResponse,
+import { OPENAPI_DOCUMENT } from "./openapi.ts";
+import {
+  createInstrumentRequest,
+  type DatabaseReachability,
+  type DeliveryBody,
+  type DeliveryResponse,
+  deliveryRequest,
+  type EligibilityResponse,
+  eligibilityRequest,
+  type ErrorResponse,
+  type HandoffResponse,
+  type HealthResponse,
+  type InstrumentResponse,
+  type SigningStatus,
+  type StatusResponse,
 } from "./wire.ts";
 
 /** The one free read the router makes before opening anything (AGENTS.md, "Vendor access"). */
@@ -95,17 +103,11 @@ export interface RouterDependencies {
 /** The largest body accepted: the provider's PDF ceiling, base64-expanded, plus room for the other fields. */
 const MAX_BODY_BYTES: number = Math.ceil((LAKAUT_MAX_DOCUMENT_BYTES * 4) / 3) + 64 * 1024;
 
-/** The vendor's cap on `fileName` (`sdk-integracion__documentos-firma.md`, "Validaciones del documento"). */
-const MAX_FILE_NAME_CHARS = 180;
-
 /**
  * How long one database probe answers for: `/health` is unauthenticated, so
  * without a window every anonymous request would open a connection.
  */
 const HEALTH_PROBE_WINDOW_MS = 10_000;
-
-/** Canonical RFC 4648 base64, padding included; the decoder is lenient, so this comes first. */
-const BASE64_SHAPE = /^[A-Za-z0-9+/]*={0,2}$/;
 
 /**
  * What `POST /api/instruments` accepts, decoded: the product's finished PDF, its
@@ -116,16 +118,6 @@ interface CreateInstrumentRequest {
   readonly fileName: string;
   readonly bytes: Uint8Array;
   readonly signer: Instrument["signer"];
-}
-
-interface DeliveryRequest {
-  readonly ceremonyId: string;
-  readonly documentId: string;
-  readonly fileName: string;
-  readonly bytesBase64: string;
-  readonly signedContentHash: string;
-  readonly finalPdfHash: string;
-  readonly signedAt: string;
 }
 
 /** What a product asks for under `/api/instruments/{id}`: the record, the sealed PDF, or the signed one. */
@@ -166,38 +158,48 @@ function correlationIdOf(error: unknown): string | undefined {
   return undefined;
 }
 
-/** The string under `key`, or a 400 naming it as `label`: the dotted path when nested. */
-function readString(source: Record<string, unknown>, key: string, label: string = key): string {
-  const value = source[key];
-  if (typeof value !== "string" || value === "") {
-    throw new RefusedError(400, `${label} must be a non-empty string`);
+/**
+ * The message a refused body earns, from the first issue's path and code and
+ * never from zod's own text or the value received: a body carries PDF bytes
+ * (STYLES §8.1), and the wording is what products already read.
+ */
+function refusalOf(issue: z.core.$ZodIssue): RefusedError {
+  const path = issue.path.length === 0 ? "body" : issue.path.map(String).join(".");
+  switch (issue.code) {
+    case "invalid_type":
+      return new RefusedError(
+        400,
+        issue.expected === "object"
+          ? `${path} must be an object`
+          : `${path} must be a non-empty string`,
+      );
+    case "too_small":
+      return new RefusedError(400, `${path} must be a non-empty string`);
+    case "too_big":
+      return new RefusedError(400, `${path} must be at most ${issue.maximum} characters`);
+    default:
+      // A regex or refine carries the message the schema gave it.
+      return new RefusedError(400, issue.message);
   }
-  return value;
 }
 
-/** A `fileName` within the vendor's cap; both routes that carry one read it here. */
-function readFileName(source: Record<string, unknown>): string {
-  const fileName = readString(source, "fileName");
-  if (fileName.length > MAX_FILE_NAME_CHARS) {
-    throw new RefusedError(400, `fileName must be at most ${MAX_FILE_NAME_CHARS} characters`);
-  }
-  return fileName;
+/** The body as the schema reads it, or the refusal its first issue earns. */
+function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
+  const result = schema.safeParse(body);
+  if (result.success) return result.data;
+  const [issue] = result.error.issues;
+  throw issue === undefined ? new RefusedError(400, "body must be an object") : refusalOf(issue);
 }
 
 /**
- * The PDF a product sent, decoded from `pdfBase64`, or the refusal it earns.
+ * The PDF a product sent, decoded, or the refusal it earns.
  *
- * Node's decoder skips what is not base64 rather than throwing, so a string
- * that merely starts well would decode to a plausible header; the shape is
- * checked before anything is decoded. The exact size check is here too:
+ * The schema has already checked the base64 shape, because Node's decoder
+ * skips what is not base64 rather than throwing. The exact size check is here:
  * `MAX_BODY_BYTES` catches gross oversize before buffering, but only the
  * decoded length says whether the provider will take the file.
  */
-function readPdf(source: Record<string, unknown>): Uint8Array {
-  const encoded = readString(source, "pdfBase64");
-  if (!BASE64_SHAPE.test(encoded) || encoded.length % 4 !== 0) {
-    throw new RefusedError(400, "pdfBase64 must be base64");
-  }
+function readPdf(encoded: string): Uint8Array {
   const bytes = new Uint8Array(Buffer.from(encoded, "base64"));
   if (!looksLikePdf(bytes)) {
     throw new RefusedError(400, "pdfBase64 must be a PDF: no %PDF- header");
@@ -212,28 +214,14 @@ function readPdf(source: Record<string, unknown>): Uint8Array {
 }
 
 function toCreateInstrumentRequest(body: unknown): CreateInstrumentRequest {
-  if (!isObject(body)) throw new RefusedError(400, "body must be an object");
-
-  const fileName = readFileName(body);
-  // The delivery route takes the provider's artefact name as it comes; this one
-  // is ours to constrain, and it is what the signer downloads.
-  if (!fileName.toLowerCase().endsWith(".pdf")) {
-    throw new RefusedError(400, "fileName must end with .pdf");
-  }
-
-  const signer = body.signer;
-  if (!isObject(signer)) throw new RefusedError(400, "signer must be an object");
-  const phone = signer.phone;
-  if (phone !== undefined && typeof phone !== "string") {
-    throw new RefusedError(400, "signer.phone must be a non-empty string");
-  }
-
+  const parsed = parseBody(createInstrumentRequest, body);
+  const phone = parsed.signer.phone;
   return {
-    reference: readString(body, "reference"),
-    fileName,
-    bytes: readPdf(body),
+    reference: parsed.reference,
+    fileName: parsed.fileName,
+    bytes: readPdf(parsed.pdfBase64),
     signer: Object.freeze({
-      email: readString(signer, "email", "signer.email"),
+      email: parsed.signer.email,
       // A blank is absent: the harness posts its empty field as "".
       ...(phone !== undefined && phone !== "" ? { phone } : {}),
     }),
@@ -243,19 +231,6 @@ function toCreateInstrumentRequest(body: unknown): CreateInstrumentRequest {
 /** Whether two signers are the same person by the fields the ceremony is opened with. */
 function sameSigner(a: Instrument["signer"], b: Instrument["signer"]): boolean {
   return a.email === b.email && a.phone === b.phone;
-}
-
-function toDeliveryRequest(body: unknown): DeliveryRequest {
-  if (!isObject(body)) throw new RefusedError(400, "body must be an object");
-  return {
-    ceremonyId: readString(body, "ceremonyId"),
-    documentId: readString(body, "documentId"),
-    fileName: readFileName(body),
-    bytesBase64: readString(body, "bytesBase64"),
-    signedContentHash: readString(body, "signedContentHash"),
-    finalPdfHash: readString(body, "finalPdfHash"),
-    signedAt: readString(body, "signedAt"),
-  };
 }
 
 /**
@@ -606,6 +581,24 @@ export function createRouter(deps: RouterDependencies): RequestListener {
     return result;
   }
 
+  /**
+   * The eligibility read, field by field. The adapter's type is not sent as-is
+   * so a field it grows later crosses the wire only once it is named here.
+   */
+  function toEligibilityResponse(eligibility: SigningEligibility): EligibilityResponse {
+    return Object.freeze({
+      decision: eligibility.decision,
+      ...(eligibility.journey !== undefined ? { journey: eligibility.journey } : {}),
+      nextAction: eligibility.nextAction,
+      ...(eligibility.retryAfterSeconds !== undefined
+        ? { retryAfterSeconds: eligibility.retryAfterSeconds }
+        : {}),
+      checkedAt: eligibility.checkedAt,
+      validUntil: eligibility.validUntil,
+      correlationId: eligibility.correlationId,
+    });
+  }
+
   function toInstrumentResponse(instrument: Instrument): InstrumentResponse {
     return Object.freeze({
       instrumentId: instrument.instrumentId,
@@ -768,7 +761,7 @@ export function createRouter(deps: RouterDependencies): RequestListener {
    */
   async function ingestDelivery(
     instrument: Instrument,
-    request: DeliveryRequest,
+    request: DeliveryBody,
   ): Promise<DeliveryResponse> {
     if (
       instrument.ceremony === undefined ||
@@ -880,6 +873,11 @@ export function createRouter(deps: RouterDependencies): RequestListener {
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/openapi.json") {
+      json(response, 200, OPENAPI_DOCUMENT);
+      return;
+    }
+
     if (request.method === "GET" && !url.pathname.startsWith("/api/")) {
       await serveStatic(url.pathname, response);
       return;
@@ -907,7 +905,7 @@ export function createRouter(deps: RouterDependencies): RequestListener {
         return;
       }
       if (request.method === "POST" && sign.action === "deliveries") {
-        const delivery = toDeliveryRequest(await readBody(request));
+        const delivery = parseBody(deliveryRequest, await readBody(request));
         json(response, 200, await ingestDelivery(instrument, delivery));
         return;
       }
@@ -925,18 +923,10 @@ export function createRouter(deps: RouterDependencies): RequestListener {
     }
 
     if (request.method === "POST" && url.pathname === "/api/eligibility") {
-      const body = await readBody(request);
-      if (!isObject(body)) throw new RefusedError(400, "body must be an object");
-      const reference = readString(body, "reference");
+      const { reference, email } = parseBody(eligibilityRequest, await readBody(request));
       try {
-        json(
-          response,
-          200,
-          await deps.checkEligibility({
-            email: readString(body, "email"),
-            externalUserRef: reference,
-          }),
-        );
+        const eligibility = await deps.checkEligibility({ email, externalUserRef: reference });
+        json(response, 200, toEligibilityResponse(eligibility));
       } catch (error) {
         // The reference is safe to log, the email is not (STYLES §8.1). A reused
         // reference is the documented cause of a bare INVALID_REQUEST here.
