@@ -48,6 +48,7 @@ import {
   type CreateSessionInput,
   type SdkFlowType,
   type SdkSessionStatus,
+  isValidSmsPhoneNumber,
   SIGNED_DOCUMENT_MAX_PDF_BYTES,
   type SignedDocumentArtifact,
   SIGNED_DOCUMENT_PROTOCOL_VERSION,
@@ -55,6 +56,17 @@ import {
 
 /** The provider's own PDF ceiling, for `SigningCoreOptions.maxDocumentBytes`. */
 export const LAKAUT_MAX_DOCUMENT_BYTES: number = SIGNED_DOCUMENT_MAX_PDF_BYTES;
+
+/**
+ * Whether the provider will text this number, by the SDK's own rule: E.164,
+ * and for Argentina `+549` followed by the ten-digit mobile number.
+ *
+ * `createSession` throws on anything else, after the eligibility read and as
+ * a plain error, so a caller checks here first and refuses with a reason.
+ */
+export function isSmsPhone(phone: string): boolean {
+  return isValidSmsPhoneNumber(phone);
+}
 
 /**
  * The slice of `SessionClient` the spine uses.

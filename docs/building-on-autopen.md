@@ -61,7 +61,8 @@ POST /api/instruments
 
 `reference` is your own id for the document; a UUID from your database is
 fine. `phone` is needed when the signer has never signed with the authority
-before, so send it. The PDF must be a real PDF and at most 21 MiB (the
+before, so send it, in E.164: for Argentina that is `+549` and the ten-digit
+mobile number, nothing else is accepted. The PDF must be a real PDF and at most 21 MiB (the
 authority's own figure is 20 MB).
 
 An instrument's identity is its reference, its bytes and its signer:
