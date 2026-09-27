@@ -30,6 +30,7 @@ import { probeDatabase } from "../src/health.ts";
 import { cryptoInstrumentIds, InMemoryInstrumentStore } from "../src/instruments.ts";
 import { createRouter, type RouterDependencies } from "../src/routes.ts";
 import type {
+  EligibilityResponse,
   ErrorResponse,
   HandoffResponse,
   HealthResponse,
@@ -68,6 +69,15 @@ const NOT_ELIGIBLE: SigningEligibility = Object.freeze({
   checkedAt: AT.toISOString(),
   validUntil: AT.toISOString(),
   correlationId: "sdk_onboarding",
+});
+
+const NOT_YET: SigningEligibility = Object.freeze({
+  decision: "RETRY_LATER",
+  nextAction: "RETRY",
+  retryAfterSeconds: 120,
+  checkedAt: AT.toISOString(),
+  validUntil: AT.toISOString(),
+  correlationId: "sdk_retry",
 });
 
 /** Records what the router asked of the provider, and answers however a test needs. */
@@ -1031,6 +1041,65 @@ describe("the product API key", () => {
     // No secret is configured, so the webhook fails closed with 503 — not 401.
     expect((await call(harness, "POST", "/api/webhooks/lakaut", "{}", "none")).status).toBe(503);
     expect(errored.filter((line) => line.startsWith("401"))).toEqual([]);
+  });
+});
+
+describe("POST /api/eligibility", () => {
+  it("returns the authority's answer field by field, with the journey when one is recommended", async () => {
+    const { status, json } = await call(harness, "POST", "/api/eligibility", {
+      reference: "harness/test-1",
+      email: "firmante@example.com",
+    });
+
+    expect(status).toBe(200);
+    expect(json).toEqual({
+      decision: "READY_FOR_SIGNING",
+      journey: "signing",
+      nextAction: "CREATE_SESSION",
+      checkedAt: AT.toISOString(),
+      validUntil: AT.toISOString(),
+      correlationId: "sdk_eligible",
+    } satisfies EligibilityResponse);
+  });
+
+  it("carries retryAfterSeconds and no journey when the authority says not yet", async () => {
+    harness.eligibility.answer = NOT_YET;
+
+    const { status, json } = await call(harness, "POST", "/api/eligibility", {
+      reference: "harness/test-1",
+      email: "firmante@example.com",
+    });
+
+    expect(status).toBe(200);
+    expect(json).toEqual({
+      decision: "RETRY_LATER",
+      nextAction: "RETRY",
+      retryAfterSeconds: 120,
+      checkedAt: AT.toISOString(),
+      validUntil: AT.toISOString(),
+      correlationId: "sdk_retry",
+    } satisfies EligibilityResponse);
+    expect(json).not.toHaveProperty("journey");
+  });
+
+  it("refuses a body missing the reference or the email, and asks the authority nothing", async () => {
+    for (const [body, missing] of [
+      [{ email: "firmante@example.com" }, "reference"],
+      [{ reference: "harness/test-1" }, "email"],
+    ] as const) {
+      const { status, json } = await call(harness, "POST", "/api/eligibility", body);
+      expect(status).toBe(400);
+      expect(json).toEqual({ error: `${missing} must be a non-empty string` });
+    }
+    expect(harness.eligibility.calls).toBe(0);
+  });
+
+  it("is POST only: a GET with a valid key is no route, not a refusal", async () => {
+    const { status, json } = await call(harness, "GET", "/api/eligibility");
+
+    expect(status).toBe(404);
+    expect(json).toEqual({ error: "no such route" } satisfies ErrorResponse);
+    expect(harness.eligibility.calls).toBe(0);
   });
 });
 

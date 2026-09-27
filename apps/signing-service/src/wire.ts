@@ -3,7 +3,12 @@
  * Node import, so the same declarations typecheck in both programs.
  */
 
-import type { CeremonyDisposition, CeremonyHandoff, CeremonyState } from "@autopen/core";
+import type {
+  CeremonyDisposition,
+  CeremonyHandoff,
+  CeremonyJourney,
+  CeremonyState,
+} from "@autopen/core";
 
 /**
  * Whether the service holds a verified signed copy.
@@ -52,6 +57,36 @@ export interface HandoffResponse {
     readonly bytesBase64: string;
     readonly sealedAt: string;
   };
+}
+
+/**
+ * The authority's answer to "does this person hold a signing certificate?".
+ *
+ * `READY_FOR_SIGNING` is the only yes. `ONBOARDING_REQUIRED` means the link
+ * will run an identity check first, and that instrument needs `signer.phone`.
+ * The other two mean not yet: `retryAfterSeconds` says when to ask again.
+ */
+export type EligibilityDecision =
+  | "READY_FOR_SIGNING"
+  | "ONBOARDING_REQUIRED"
+  | "CERTIFICATE_PREPARING"
+  | "RETRY_LATER";
+
+/**
+ * `POST /api/eligibility`: the free read a product makes before creating an
+ * instrument, so its mail can say "sign in a minute" or "bring your DNI".
+ *
+ * `journey` is absent when the authority recommends none. `validUntil` is
+ * usually seconds after `checkedAt`: read again rather than cache.
+ */
+export interface EligibilityResponse {
+  readonly decision: EligibilityDecision;
+  readonly journey?: CeremonyJourney;
+  readonly nextAction: "CREATE_SESSION" | "RETRY" | "CONTACT_LAKAUT";
+  readonly retryAfterSeconds?: number;
+  readonly checkedAt: string;
+  readonly validUntil: string;
+  readonly correlationId: string;
 }
 
 /**

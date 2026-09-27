@@ -48,6 +48,7 @@ import type { Instrument, InstrumentIds, InstrumentStore } from "./instruments.t
 import type {
   DatabaseReachability,
   DeliveryResponse,
+  EligibilityResponse,
   ErrorResponse,
   HandoffResponse,
   HealthResponse,
@@ -606,6 +607,24 @@ export function createRouter(deps: RouterDependencies): RequestListener {
     return result;
   }
 
+  /**
+   * The eligibility read, field by field. The adapter's type is not sent as-is
+   * so a field it grows later crosses the wire only once it is named here.
+   */
+  function toEligibilityResponse(eligibility: SigningEligibility): EligibilityResponse {
+    return Object.freeze({
+      decision: eligibility.decision,
+      ...(eligibility.journey !== undefined ? { journey: eligibility.journey } : {}),
+      nextAction: eligibility.nextAction,
+      ...(eligibility.retryAfterSeconds !== undefined
+        ? { retryAfterSeconds: eligibility.retryAfterSeconds }
+        : {}),
+      checkedAt: eligibility.checkedAt,
+      validUntil: eligibility.validUntil,
+      correlationId: eligibility.correlationId,
+    });
+  }
+
   function toInstrumentResponse(instrument: Instrument): InstrumentResponse {
     return Object.freeze({
       instrumentId: instrument.instrumentId,
@@ -929,14 +948,11 @@ export function createRouter(deps: RouterDependencies): RequestListener {
       if (!isObject(body)) throw new RefusedError(400, "body must be an object");
       const reference = readString(body, "reference");
       try {
-        json(
-          response,
-          200,
-          await deps.checkEligibility({
-            email: readString(body, "email"),
-            externalUserRef: reference,
-          }),
-        );
+        const eligibility = await deps.checkEligibility({
+          email: readString(body, "email"),
+          externalUserRef: reference,
+        });
+        json(response, 200, toEligibilityResponse(eligibility));
       } catch (error) {
         // The reference is safe to log, the email is not (STYLES §8.1). A reused
         // reference is the documented cause of a bare INVALID_REQUEST here.
