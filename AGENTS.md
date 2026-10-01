@@ -46,6 +46,7 @@ docs/vendor/lakaut/        21 mirrored Lakaut doc pages + llms.txt, pinned at SD
 scripts/verify.sh          the one command that must pass on a laptop and in the cloud
 scripts/check-docs.mjs     the checkable half of STYLES §5
 lefthook.yml               git hooks: format on commit, check on push
+.mcp.json                  Linear MCP for the `lucero` workspace (team LUC); authenticate with /mcp
 ```
 
 `apps/` vs `packages/` is **deployable vs importable**: an app has a process, a
