@@ -40,7 +40,7 @@ import type {
   SignerRole,
   VerifiedArtifact,
 } from "@autopen/core";
-import { type SessionClient, toRendererContext } from "@lakaut/server";
+import { OpenSslCmsVerifier, type SessionClient, toRendererContext } from "@lakaut/server";
 import type { SignedPdfVerificationEvidence } from "@lakaut/server";
 import {
   type AuthenticationProfileId,
@@ -56,6 +56,18 @@ import {
 
 /** The provider's own PDF ceiling, for `SigningCoreOptions.maxDocumentBytes`. */
 export const LAKAUT_MAX_DOCUMENT_BYTES: number = SIGNED_DOCUMENT_MAX_PDF_BYTES;
+
+/**
+ * Proves the artefact verifier can run here, or throws saying why.
+ *
+ * `verifyAndAcknowledgeSignedArtifact` validates the CMS signature by shelling
+ * out to `openssl` 3.x by default, so a host without the binary fails every
+ * custody with an opaque wrapper. A deployment asserts this once at boot and
+ * refuses to start, rather than accepting signatures it cannot verify.
+ */
+export async function assertArtifactVerifierReady(): Promise<void> {
+  await new OpenSslCmsVerifier().assertReady();
+}
 
 /**
  * Whether the provider will text this number, by the SDK's own rule: E.164,

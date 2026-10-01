@@ -19,7 +19,11 @@ import {
 } from "@lakaut/shared-contracts";
 import { describe, expect, it } from "vitest";
 
-import { type LakautSessions, LakautSignatureProvider } from "../src/provider.ts";
+import {
+  assertArtifactVerifierReady,
+  type LakautSessions,
+  LakautSignatureProvider,
+} from "../src/provider.ts";
 
 const AT = new Date("2026-09-11T12:00:00.000Z");
 const now: Clock = () => AT;
@@ -307,6 +311,12 @@ describe("authoritativeStatus", () => {
     const status = await provider.authoritativeStatus(SESSION_ID as CeremonyId);
 
     expect(status.disposition).toBeUndefined();
+  });
+});
+
+describe("assertArtifactVerifierReady", () => {
+  it("resolves where openssl 3 is installed, which every host running custody must be", async () => {
+    await expect(assertArtifactVerifierReady()).resolves.toBeUndefined();
   });
 });
 

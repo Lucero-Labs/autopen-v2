@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import { DefaultSigningCore, InMemoryCeremonyLedger, InMemoryDocumentStore } from "@autopen/core";
 import {
+  assertArtifactVerifierReady,
   checkSigningEligibility,
   createLakautProvider,
   LAKAUT_MAX_DOCUMENT_BYTES,
@@ -55,12 +56,21 @@ const core = new DefaultSigningCore({
   maxDocumentBytes: LAKAUT_MAX_DOCUMENT_BYTES,
 });
 
-// Fail closed at boot (STYLES §0.1); the message names only the path.
+// Fail closed at boot (STYLES §0.1); the messages name a path or a program, never a value.
 const evidence = new DirectoryEvidenceStore(EVIDENCE);
 try {
   await evidence.ensureWritable();
 } catch (error) {
   console.error(error instanceof Error ? error.message : "evidence directory check failed");
+  process.exit(1);
+}
+try {
+  await assertArtifactVerifierReady();
+} catch (error) {
+  console.error(
+    `artefact verifier is not ready: ${error instanceof Error ? error.message : "unknown"}; ` +
+      "custody needs openssl 3.x on this host",
+  );
   process.exit(1);
 }
 
