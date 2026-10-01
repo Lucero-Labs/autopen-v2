@@ -61,6 +61,11 @@ RUN pnpm install --frozen-lockfile --prod --filter "@autopen/signing-service..."
 # evidence directory is created for it so the service boots without a volume.
 FROM node:22-slim AS runtime
 ENV NODE_ENV=production
+# The vendor's artefact verification shells out to `openssl` (3.x); the slim
+# image has the library, not the binary. Boot refuses to start without it.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/packages/adapter-lakaut/node_modules ./packages/adapter-lakaut/node_modules

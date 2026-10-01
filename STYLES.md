@@ -304,10 +304,13 @@ crosses the provider port — the adapter must never own the evidence store, or
 - `auth.document.signed` upgrades from `1.1.0` to `1.2.0` only once the artefact
   is `BOUND`. The two are never both emitted for one signature and there is no
   backfill, so a handler that accepts one version silently misses the other.
-- The low-level path, `verifySignedPdfArtifact`, takes three positional
-  arguments rather than one object, and its supplied `OpenSslCmsVerifier` shells
-  out — choosing it puts `openssl` on the backend's deployment requirements.
-  The composite lane does not.
+- Both lanes shell out to `openssl` 3.x: the composite calls
+  `verifySignedPdfArtifact` underneath, whose default CMS verifier is the
+  supplied `OpenSslCmsVerifier`. The binary is a deployment requirement: a
+  slim image does not carry it, and its absence surfaces as an opaque
+  "Custody failed" on every delivery, so the image installs it and the service
+  asserts it at boot. The low-level path additionally takes three positional
+  arguments rather than one object.
 
 ### 9.6 Some fields compile, validate, and are discarded
 
