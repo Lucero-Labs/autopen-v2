@@ -139,9 +139,18 @@ class RefusedError extends Error {
   }
 }
 
-/** An error's message, or a stand-in. Never the value itself, which may carry bytes. */
+/**
+ * An error's message and those of its causes, innermost last. Never the value
+ * itself, which may carry bytes; a custody failure is only its cause's message.
+ */
 function describe(error: unknown): string {
-  return error instanceof Error ? error.message : "unknown failure";
+  const messages: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
+    messages.push(current.message);
+    current = current.cause;
+  }
+  return messages.length === 0 ? "unknown failure" : messages.join(" <- ");
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

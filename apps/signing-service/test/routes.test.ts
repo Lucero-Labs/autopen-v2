@@ -778,15 +778,21 @@ describe("POST /api/sign/{token}/handoff", () => {
   it("hands a 500 the provider's correlationId and nothing else", async () => {
     const { token } = await createInstrument(harness);
     await handoff(harness, token);
-    harness.provider.statusThrows = Object.assign(new Error("UPSTREAM_UNAVAILABLE at /internal"), {
-      correlationId: "sdk_failed",
-    });
+    harness.provider.statusThrows = Object.assign(
+      new Error("UPSTREAM_UNAVAILABLE at /internal", {
+        cause: new Error("Session status failed [502]"),
+      }),
+      { correlationId: "sdk_failed" },
+    );
 
     const { status, json } = await call(harness, "POST", `/api/sign/${token}/handoff`);
 
     expect(status).toBe(500);
     expect(json).toEqual({ error: "error interno", correlationId: "sdk_failed" });
-    expect(errored.join("\n")).toContain("UPSTREAM_UNAVAILABLE at /internal");
+    // The log carries the cause chain, since a wrapped failure's own message says nothing.
+    expect(errored.join("\n")).toContain(
+      "UPSTREAM_UNAVAILABLE at /internal <- Session status failed [502]",
+    );
   });
 });
 
