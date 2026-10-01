@@ -201,7 +201,7 @@ as arguments and never read `process.env` (`adapter-lakaut/src/client.ts`).
 Two templates describe what is read, and both are checked in because neither
 holds a value:
 
-- `.env.example` — the six `LAKAUT_*` variables, each with the constraint that
+- `.env.example` — the `LAKAUT_*` variables, each with the constraint that
   makes it dangerous to get wrong, and the service's own four (`PORT`,
   `EVIDENCE_DIR`, `AUTOPEN_API_KEY`, `DATABASE_URL`), which `env.ts` — still
   the only reader — validates the same way. Copy to `.env`.

@@ -1,12 +1,15 @@
-import type {
-  CeremonyDisposition,
-  CeremonyId,
-  CeremonyPlan,
-  Clock,
-  ContentHash,
-  DocumentId,
-  SealedDocument,
-  SignedDelivery,
+import { createHash } from "node:crypto";
+
+import {
+  type CeremonyDisposition,
+  type CeremonyId,
+  type CeremonyPlan,
+  type Clock,
+  type ContentHash,
+  type DocumentId,
+  DocumentNotIncrementallySignableError,
+  type SealedDocument,
+  type SignedDelivery,
 } from "@autopen/core";
 import {
   AUTH_ERROR_CODES,
@@ -23,6 +26,7 @@ import {
   assertArtifactVerifierReady,
   type LakautSessions,
   LakautSignatureProvider,
+  type SigningLane,
 } from "../src/provider.ts";
 
 const AT = new Date("2026-09-11T12:00:00.000Z");
@@ -40,6 +44,36 @@ const SEALED: SealedDocument = Object.freeze({
   bytes: Uint8Array.from([0x25, 0x50, 0x44, 0x46]),
   sealedAt: AT.toISOString(),
 });
+
+/**
+ * A one-page PDF with a correct cross-reference table, built by hand so the
+ * SDK's preflight — which walks `startxref` and checks every offset — accepts
+ * it. Every byte is ASCII, so string offsets are byte offsets. An extra object
+ * is appended verbatim, which is how a test plants a signature dictionary.
+ */
+function onePagePdf(extraObject?: string): Uint8Array {
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>",
+    ...(extraObject === undefined ? [] : [extraObject]),
+  ];
+  let text = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  objects.forEach((object, index) => {
+    offsets.push(text.length);
+    text += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = text.length;
+  text += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets) text += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  text += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return new TextEncoder().encode(text);
+}
+
+/** A signature whose DocMDP permission is 1: certified, no changes allowed. */
+const NO_CHANGES_SIGNATURE =
+  "<< /Type /Sig /Reference [<< /TransformMethod /DocMDP /TransformParams << /P 1 /V /1.2 >> >>] >>";
 
 const DELIVERY: SignedDelivery = Object.freeze({
   ceremonyId: SESSION_ID as CeremonyId,
@@ -100,7 +134,7 @@ interface Recorder {
   custodyRan: boolean;
 }
 
-function build(options: { status?: AuthoritativeSessionStatus } = {}) {
+function build(options: { status?: AuthoritativeSessionStatus; lane?: SigningLane } = {}) {
   const recorder: Recorder = { created: [], custodyRan: false };
 
   const sessions: LakautSessions = {
@@ -171,6 +205,7 @@ function build(options: { status?: AuthoritativeSessionStatus } = {}) {
   const provider = new LakautSignatureProvider({
     sessions,
     allowedOrigin: "https://dev.lucerolabs.xyz",
+    signingLane: options.lane ?? "rewrite",
     now,
   });
 
@@ -247,6 +282,41 @@ describe("openCeremony", () => {
     );
 
     expect(recorder.created[0]?.identitySubject).toEqual({ dni: "30123456", sexo: "F" });
+  });
+
+  it("asks for nothing incremental on the rewrite lane, which is the SDK's default", async () => {
+    const { provider, recorder } = build({ lane: "rewrite" });
+
+    await provider.openCeremony(SEALED, { role: "librador" }, PLAN);
+
+    expect(recorder.created[0]?.incrementalSigning).toBeUndefined();
+  });
+
+  it("on the incremental lane, asks for one appended revision bound to the sealed bytes' hash", async () => {
+    const { provider, recorder } = build({ lane: "incremental" });
+    const bytes = onePagePdf();
+
+    await provider.openCeremony({ ...SEALED, bytes }, { role: "librador" }, PLAN);
+
+    expect(recorder.created[0]?.incrementalSigning).toEqual({
+      capability: "INCREMENTAL_PADES_B_T_V1",
+      sourcePdfHash: createHash("sha256").update(bytes).digest("hex"),
+      sourceRevisionCount: 1,
+    });
+  });
+
+  it("refuses a certified no-changes document by its code, and opens no session for it", async () => {
+    const { provider, recorder } = build({ lane: "incremental" });
+    const bytes = onePagePdf(NO_CHANGES_SIGNATURE);
+
+    const attempt = provider.openCeremony({ ...SEALED, bytes }, { role: "librador" }, PLAN);
+
+    await expect(attempt).rejects.toBeInstanceOf(DocumentNotIncrementallySignableError);
+    await expect(attempt).rejects.toMatchObject({
+      documentId: SEALED.documentId,
+      reason: "PDF_MODIFICATION_FORBIDDEN",
+    });
+    expect(recorder.created).toHaveLength(0);
   });
 
   it("uses the session id as the ceremony id, so a webhook routes without a lookup table", async () => {
@@ -353,6 +423,7 @@ describe("verifyArtifact", () => {
     const probe = new LakautSignatureProvider({
       sessions,
       allowedOrigin: "https://dev.lucerolabs.xyz",
+      signingLane: "rewrite",
       now,
     });
 

@@ -248,6 +248,8 @@ Service variables, all read by `src/env.ts` and described in `.env.example`:
 - `LAKAUT_ALLOWED_ORIGIN` — the service's own `https://` domain, exactly.
 - `LAKAUT_HOSTED_UI_ORIGIN` — the Hosted UI's origin, as given at onboarding.
 - `LAKAUT_WEBHOOK_SECRET` — from the dashboard, once the webhook URL is saved.
+- `LAKAUT_SIGNING_LANE` — `rewrite` (default) or `incremental`; the second keeps
+  prior signatures but is not yet verifiable here, so it is an experiment.
 - `AUTOPEN_API_KEY` — `openssl rand -base64 32`; the product's key.
 - `EVIDENCE_DIR` — a path on a mounted volume, e.g. `/data/evidence`. The
   server must be able to write there as the `node` user.

@@ -55,6 +55,16 @@ describe("the environment schema", () => {
     expect(parse({ AUTOPEN_API_KEY: "x".repeat(32) }).success).toBe(true);
   });
 
+  it("defaults LAKAUT_SIGNING_LANE to rewrite, and names the two lanes when refusing another", () => {
+    expect(parse({}).data?.LAKAUT_SIGNING_LANE).toBe("rewrite");
+    expect(parse({ LAKAUT_SIGNING_LANE: "incremental" }).data?.LAKAUT_SIGNING_LANE).toBe(
+      "incremental",
+    );
+    expect(messagesOf(parse({ LAKAUT_SIGNING_LANE: "pades" }))).toEqual([
+      "must be rewrite or incremental",
+    ]);
+  });
+
   it("leaves EVIDENCE_DIR and DATABASE_URL optional, and refuses a DATABASE_URL that is not a URL", () => {
     const bare = parse({});
     expect(bare.data?.EVIDENCE_DIR).toBeUndefined();

@@ -147,7 +147,12 @@ function describe(error: unknown): string {
   const messages: string[] = [];
   let current: unknown = error;
   for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
-    messages.push(current.message);
+    // The SDK's verification errors carry the useful word apart from the
+    // message: `signed_document_verification_failed (cms_signature_invalid)`.
+    const diagnostic = "diagnosticCode" in current ? current.diagnosticCode : undefined;
+    messages.push(
+      typeof diagnostic === "string" ? `${current.message} (${diagnostic})` : current.message,
+    );
     current = current.cause;
   }
   return messages.length === 0 ? "unknown failure" : messages.join(" <- ");

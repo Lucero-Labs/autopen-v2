@@ -5,6 +5,7 @@ export {
   LAKAUT_MAX_DOCUMENT_BYTES,
   type LakautProviderOptions,
   type LakautSessions,
+  type SigningLane,
 } from "./provider.ts";
 
 export {

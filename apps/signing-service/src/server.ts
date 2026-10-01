@@ -42,6 +42,7 @@ const LAKAUT = {
   apiKey: env.LAKAUT_API_KEY,
   environment: env.LAKAUT_ENVIRONMENT,
   allowedOrigin: env.LAKAUT_ALLOWED_ORIGIN,
+  signingLane: env.LAKAUT_SIGNING_LANE,
   now: () => new Date(),
 } as const;
 
@@ -97,7 +98,8 @@ const server = createServer(
 ).listen(env.PORT, () => {
   // Safe to log: a port, a declared origin and a directory (STYLES §8.1).
   console.log(
-    `listening on port ${env.PORT}  declared origin ${env.LAKAUT_ALLOWED_ORIGIN}  evidence ${EVIDENCE}`,
+    `listening on port ${env.PORT}  declared origin ${env.LAKAUT_ALLOWED_ORIGIN}  ` +
+      `evidence ${EVIDENCE}  signing lane ${env.LAKAUT_SIGNING_LANE}`,
   );
 });
 
