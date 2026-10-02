@@ -6,7 +6,7 @@
  * creation, the renderer context, the error taxonomy, the 1.2 binding lane and
  * the distinction between a session's status and a document's.
  *
- * Three decisions are worth knowing about.
+ * Four decisions are worth knowing about.
  *
  * A ceremony *is* a Lakaut session, so `ceremonyId` is the `sessionId`. Nothing
  * is gained by inventing a second identifier the provider has never heard of,
@@ -22,30 +22,48 @@
  * dispositions, and its default for an unknown code is already `retry-in-step` —
  * a rule that exists because a code missing from a hand-written list destroyed
  * a real signing flow at another integrator (STYLES §9.3).
+ *
+ * The signing lane is chosen by the deployment, not per document. rc.40 signs
+ * two ways: by default the Hosted UI rewrites the whole PDF, which invalidates
+ * every signature already on it; on request it appends one incremental
+ * revision instead. The request is an opt-in on `createSession`, bound to a
+ * hash of the exact bytes the session will show, and the SDK computes it from
+ * a preflight of those bytes. A document the preflight refuses is refused
+ * outright — never signed on the rewrite lane as a fallback (STYLES §0.1).
+ * The incremental lane also changes verification: the authority then answers
+ * under contract 1.3, which `verifyArtifact` does not yet satisfy. Until it
+ * does, a session opened on this lane is signed but not bound.
  */
 
-import type {
-  AuthenticationFactors,
-  Ceremony,
-  CeremonyId,
-  CeremonyJourney,
-  CeremonyPlan,
-  CeremonyState,
-  CeremonyStatus,
-  Clock,
-  CustodySink,
-  SealedDocument,
-  SignatureProvider,
-  SignedDelivery,
-  SignerRole,
-  VerifiedArtifact,
+import {
+  type AuthenticationFactors,
+  type Ceremony,
+  type CeremonyId,
+  type CeremonyJourney,
+  type CeremonyPlan,
+  type CeremonyState,
+  type CeremonyStatus,
+  type Clock,
+  type CustodySink,
+  DocumentNotIncrementallySignableError,
+  type SealedDocument,
+  type SignatureProvider,
+  type SignedDelivery,
+  type SignerRole,
+  type VerifiedArtifact,
 } from "@autopen/core";
-import { OpenSslCmsVerifier, type SessionClient, toRendererContext } from "@lakaut/server";
+import {
+  OpenSslCmsVerifier,
+  preflightIncrementalPdfForSession,
+  type SessionClient,
+  toRendererContext,
+} from "@lakaut/server";
 import type { SignedPdfVerificationEvidence } from "@lakaut/server";
 import {
   type AuthenticationProfileId,
   categoryFor,
   type CreateSessionInput,
+  type IncrementalSigningRequestV1,
   type SdkFlowType,
   type SdkSessionStatus,
   isValidSmsPhoneNumber,
@@ -92,7 +110,17 @@ export type LakautSessions = Pick<
   "createSession" | "getSession" | "verifyAndAcknowledgeSignedArtifact"
 >;
 
-/** What `LakautSignatureProvider` needs beyond the port: a session client and an origin. */
+/**
+ * How the Hosted UI writes the signature into the PDF.
+ *
+ * `rewrite` is rc.40's default: the whole file is re-serialised, so any prior
+ * signature on it stops verifying. `incremental` asks for one appended
+ * revision (`INCREMENTAL_PADES_B_T_V1`), which keeps prior signatures intact
+ * and is what a second signer on the same document needs.
+ */
+export type SigningLane = "rewrite" | "incremental";
+
+/** What `LakautSignatureProvider` needs beyond the port: a session client, an origin and a lane. */
 export interface LakautProviderOptions {
   readonly sessions: LakautSessions;
   /**
@@ -102,6 +130,7 @@ export interface LakautProviderOptions {
    * Hosted UI reaches the page by `postMessage`, which demands an exact target.
    */
   readonly allowedOrigin: string;
+  readonly signingLane: SigningLane;
   readonly now: Clock;
 }
 
@@ -174,11 +203,13 @@ function toCeremonyState(status: SdkSessionStatus): CeremonyState {
 export class LakautSignatureProvider implements SignatureProvider {
   readonly #sessions: LakautSessions;
   readonly #allowedOrigin: string;
+  readonly #signingLane: SigningLane;
   readonly #now: Clock;
 
   constructor(options: LakautProviderOptions) {
     this.#sessions = options.sessions;
     this.#allowedOrigin = options.allowedOrigin;
+    this.#signingLane = options.signingLane;
     this.#now = options.now;
   }
 
@@ -187,6 +218,9 @@ export class LakautSignatureProvider implements SignatureProvider {
     signer: SignerRole,
     plan: CeremonyPlan,
   ): Promise<Ceremony> {
+    const incrementalSigning =
+      this.#signingLane === "incremental" ? await incrementalRequestFor(document) : undefined;
+
     // Optional fields by conditional spread: `exactOptionalPropertyTypes` makes
     // assigning `undefined` a type error, not a no-op (STYLES §4).
     const input: CreateSessionInput = {
@@ -194,6 +228,7 @@ export class LakautSignatureProvider implements SignatureProvider {
       authenticationProfileId: toProfileId(plan.factors),
       allowedOrigin: this.#allowedOrigin,
       capabilities: ["signed-document-reconciliation:1.2"],
+      ...(incrementalSigning !== undefined ? { incrementalSigning } : {}),
       ...(signer.email !== undefined ? { email: signer.email } : {}),
       ...(signer.phone !== undefined ? { phone: signer.phone } : {}),
       ...(signer.externalUserRef !== undefined ? { externalUserRef: signer.externalUserRef } : {}),
@@ -281,6 +316,33 @@ export class LakautSignatureProvider implements SignatureProvider {
       );
     }
     return verified;
+  }
+}
+
+/**
+ * The incremental opt-in for one sealed document, or why there cannot be one.
+ *
+ * The SDK's preflight hashes the bytes, counts their revisions and refuses
+ * what the lane cannot sign: encrypted, XFA, external actions, a certified
+ * "no changes" document. It also refuses, for now, any document that already
+ * carries a signature or a modification policy, because vouching for those
+ * takes a verifier this adapter does not supply yet; a second signer is
+ * therefore refused rather than let through unverified. The SDK reports each
+ * case as a bare `Error` whose message is the code, which is wrapped here into
+ * a domain error carrying the code by name.
+ */
+async function incrementalRequestFor(
+  document: SealedDocument,
+): Promise<IncrementalSigningRequestV1> {
+  try {
+    // The SDK's own default ceiling, not ours: the Hosted UI runs the same
+    // preflight with the same default, and a file we let through that it then
+    // refuses fails inside the iframe, where nothing of ours can see it.
+    const preflight = await preflightIncrementalPdfForSession({ pdfBytes: document.bytes });
+    return preflight.request;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "PDF_STRUCTURE_INVALID";
+    throw new DocumentNotIncrementallySignableError(document.documentId, reason, error);
   }
 }
 

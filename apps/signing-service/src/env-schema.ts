@@ -36,6 +36,13 @@ export const ENV_SCHEMA = Object.freeze({
   // Blank until a destination is saved in the dashboard; the webhook route
   // refuses deliveries meanwhile.
   LAKAUT_WEBHOOK_SECRET: z.string().optional(),
+  // How the Hosted UI writes the signature into the PDF. `rewrite` is the
+  // SDK's default and breaks any prior signature; `incremental` appends one
+  // revision, which is what a second signer needs — and what verification does
+  // not yet satisfy, so for now it is an experiment, never the default.
+  LAKAUT_SIGNING_LANE: z
+    .enum(["rewrite", "incremental"], { error: "must be rewrite or incremental" })
+    .default("rewrite"),
   // Railway injects one; a laptop takes the default.
   PORT: z.coerce
     .number({ error: "must be a port number" })

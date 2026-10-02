@@ -56,4 +56,5 @@ export {
   DocumentNotSealedError,
   CustodyFailedError,
   DeliveryMismatchError,
+  DocumentNotIncrementallySignableError,
 } from "./errors.ts";

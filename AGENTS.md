@@ -46,6 +46,7 @@ docs/vendor/lakaut/        21 mirrored Lakaut doc pages + llms.txt, pinned at SD
 scripts/verify.sh          the one command that must pass on a laptop and in the cloud
 scripts/check-docs.mjs     the checkable half of STYLES §5
 lefthook.yml               git hooks: format on commit, check on push
+.mcp.json                  Linear MCP for the `lucero` workspace (team LUC); authenticate with /mcp
 ```
 
 `apps/` vs `packages/` is **deployable vs importable**: an app has a process, a
@@ -200,7 +201,7 @@ as arguments and never read `process.env` (`adapter-lakaut/src/client.ts`).
 Two templates describe what is read, and both are checked in because neither
 holds a value:
 
-- `.env.example` — the six `LAKAUT_*` variables, each with the constraint that
+- `.env.example` — the `LAKAUT_*` variables, each with the constraint that
   makes it dangerous to get wrong, and the service's own four (`PORT`,
   `EVIDENCE_DIR`, `AUTOPEN_API_KEY`, `DATABASE_URL`), which `env.ts` — still
   the only reader — validates the same way. Copy to `.env`.

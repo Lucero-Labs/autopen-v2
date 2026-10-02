@@ -16,7 +16,7 @@ import type { CeremonyJourney, Clock } from "@autopen/core";
 import { HttpAuthTransport, SessionClient } from "@lakaut/server";
 import type { CompatibilityMetadata } from "@lakaut/shared-contracts";
 
-import { LakautSignatureProvider } from "./provider.ts";
+import { LakautSignatureProvider, type SigningLane } from "./provider.ts";
 
 /**
  * Lakaut's three environments, restated so callers need not import the vendor.
@@ -136,6 +136,8 @@ export interface LakautClientOptions {
    * target.
    */
   readonly allowedOrigin: string;
+  /** Which of the provider's two signing lanes every session asks for; see `SigningLane`. */
+  readonly signingLane: SigningLane;
   readonly now: Clock;
 }
 
@@ -157,6 +159,7 @@ export function createLakautProvider(options: LakautClientOptions): LakautSignat
   return new LakautSignatureProvider({
     sessions: sessionsFor(options),
     allowedOrigin: options.allowedOrigin,
+    signingLane: options.signingLane,
     now: options.now,
   });
 }

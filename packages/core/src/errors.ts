@@ -110,6 +110,26 @@ export class CustodyFailedError extends CoreError {
 }
 
 /**
+ * The provider will not add a signature to this document as it stands.
+ *
+ * Raised before any session exists, from the provider's own inspection of the
+ * sealed bytes: a certified "no changes" document, an encrypted one, a prior
+ * signature it cannot vouch for. `reason` is the provider's code, kept verbatim
+ * so a caller can refuse with it rather than paraphrase. The fallback of
+ * rewriting the file, which would invalidate every signature already on it, is
+ * never taken (STYLES §0.1).
+ */
+export class DocumentNotIncrementallySignableError extends CoreError {
+  constructor(
+    readonly documentId: string,
+    readonly reason: string,
+    override readonly cause: unknown,
+  ) {
+    super(`Document "${documentId}" cannot take an incremental signature: ${reason}`);
+  }
+}
+
+/**
  * A delivery names a document that is not the one its ceremony was opened for.
  *
  * The provider would refuse the cross-check anyway, but only after the bytes
